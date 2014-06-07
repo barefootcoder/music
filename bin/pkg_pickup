@@ -1,0 +1,7 @@
+#! /bin/bash
+
+ferryfile=/tmp/music_ferry.tgz
+scp -p bahamut:$ferryfile /tmp
+cd $MUSICHOME
+tar xvpzf $ferryfile
+echo 

@@ -1,0 +1,16 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+use File::Basename;
+
+
+foreach (glob("*.mp3"))
+{
+	my $base = basename($_, ".mp3");
+	print "\nconverting $base ...";
+	system("mpg123 -w '$base.wav' '$base.mp3'");
+}
+
+print "\ndone.\n";

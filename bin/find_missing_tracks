@@ -1,0 +1,46 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+use File::Basename;
+
+use constant DEBUG => 0;
+
+
+my @files_to_check;
+foreach my $arg (@ARGV)
+{
+	if (-f $arg)
+	{
+		push @files_to_check, $arg;
+	}
+	elsif (-d $arg)
+	{
+		push @files_to_check, glob("$arg/*");
+	}
+	else
+	{
+		die("can't access $arg");
+	}
+}
+print STDERR "files to check: @files_to_check\n" if DEBUG;
+
+
+foreach my $file (@files_to_check)
+{
+	my $album = basename($file);
+	print STDERR "  checking : $album\n" if DEBUG;
+
+	open(IN, $file) or die("can't open file $file");
+	while ( <IN> )
+	{
+		next if /^#/;
+		chomp;
+
+		print STDERR "    checking : $_\n" if DEBUG >= 2;
+		print "$album :: MISSING: $_\n" unless -r $_;
+		
+	}
+	close(IN);
+}

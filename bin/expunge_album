@@ -1,0 +1,48 @@
+#! /usr/bin/env perl
+
+use myperl;
+
+use Music;
+
+
+my $album_dir = dir($ARGV[0]);
+
+unless (-d $album_dir)
+{
+	print STDERR "need a valid Album directory to get rid of\n";
+}
+
+system("rm", "-rf", $album_dir);
+if (-d $album_dir)
+{
+	die("couldn't ditch album directory!");
+}
+print "removed songs\n";
+
+my $album = $album_dir->dir_list(-1);
+my $tracklist = album(tracklist => $album);
+if (-e $tracklist)
+{
+	unlink $tracklist and print "removed tracklist\n";
+}
+else
+{
+	print "can't find tracklist\n";
+}
+
+my $cover = album(cover => $album);
+my @possibles = glob($cover);
+if (@possibles == 0)
+{
+	print "can't find cover ($cover.*)\n";
+}
+elsif (@possibles > 1)
+{
+	print "found too many possible covers!\n";
+}
+else
+{
+	unlink $possibles[0] and print "removed cover\n";
+}
+
+rebuild_playlists();

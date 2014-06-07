@@ -1,0 +1,47 @@
+#! /usr/bin/env perl
+
+use myperl;
+
+use MP3::Tag;
+use File::Basename;
+use Method::Signatures;
+use File::Glob ':glob';
+
+
+say 'Singles:';
+our $INDENT = 2;
+foreach my $file (glob("$ENV{MUSICHOME}/Singles/*"))
+{
+	#say_if_no_pic($file);
+}
+
+
+say 'Albums:';
+$INDENT = 4;
+foreach my $dir (glob("$ENV{MUSICHOME}/Albums/*"))
+{
+	my $album = basename($dir);
+#say "checking $album ...";
+	foreach my $file (glob("$dir/*"))
+	{
+		say_if_no_pic($file, $album);
+	}
+}
+
+
+func say_if_no_pic ($file, $album?)
+{
+	state $printed = {};
+
+	my $tag = MP3::Tag->new($file);
+	die("can't get tag for file $file") unless $tag;
+	unless ($tag->have_id3v2_frame_by_descr('APIC'))
+	{
+		if ($album and !$printed->{$album})
+		{
+			say ' ' x ($INDENT/2), $album;
+			$printed->{$album} = 1;
+		}
+		say ' ' x $INDENT, $tag->interpolate('%f');
+	}
+}

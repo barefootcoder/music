@@ -1,0 +1,18 @@
+#!/usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use MP3::Tag;
+
+use Music;
+
+
+my $album = dir(shift);
+unless (-d $album and $album->dir_list(-2) eq 'Albums')
+{
+	usage_error("I need an album directory to remake the tracklist of");
+}
+$album = $album->dir_list(-1);
+
+generate_tracklist($album);

@@ -1,0 +1,56 @@
+#! /usr/bin/env perl
+
+use myperl;
+use autodie qw< :all >;
+
+use MP3::Tag;
+use Getopt::Std;
+use File::Glob ':bsd_glob';
+
+use Music;
+
+$| = 1;
+
+
+my $opts = {};
+getopts('hl:', $opts);
+
+HELP_MESSAGE() if $opts->{h};
+
+sub HELP_MESSAGE
+{
+	say STDERR "usage: $ME [-h] | <genre> | -l <file>";
+	say STDERR "           -l : find genres like this one";
+	say STDERR "           -h : this help message";
+	say STDERR "          <genre> : a genre (case-sensitive)";
+	say STDERR "          <file>  : an MP3 file, or an album dir";
+	exit;
+}
+
+
+my $genre = shift // genre_like($opts->{l});
+usage_error("must supply genre") unless $genre;
+say "searching for $genre ...";
+
+foreach (sort { lc $a cmp lc $b } $ALBUM_DIR->children)
+{
+	next unless -d $_;
+
+	my $sample_file = first { ! -d $_ } $_->children;
+	my $tag = MP3::Tag->new($sample_file);
+	say $_->basename if $tag->genre eq $genre;
+}
+
+
+func genre_like ($filename)
+{
+	my $file = $filename;
+	($file) = grep { /\.mp3$/ } glob("$file/*") if -d $file;
+	if ($file && -r $file)
+	{
+		my $tag = MP3::Tag->new($file);
+		return $tag->genre if $tag;
+	}
+
+	fatal_error("can't figure out what to do with $filename");
+}

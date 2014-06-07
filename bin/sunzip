@@ -1,0 +1,111 @@
+#!/usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use MP3::Tag;
+use IO::Prompt;
+use File::Copy;
+
+use Music;
+
+
+# check args
+my $zip = file(shift);
+my ($album) = $zip->basename =~ /^(.*)\.zip$/;
+unless ($album)
+{
+	usage_error("I need a zipfile to play with");
+}
+
+
+=begin old_way
+
+# fixup album name if necessary
+my $va = 0;
+my ($artist, $album_title) = title($album =~ /^(.*?) - (.*)$/);
+$album_title =~ s/(\s+-\s+[A-Z]\d+)?\s*---\s*Jamendo.*$//;
+if ($artist eq 'VA')
+{
+	if ( prompt -yd => 'n', "Multi-artist album?  " )
+	{
+		undef $artist;
+		$va = 1;
+	}
+}
+debuggit("artist", $artist, "album title", $album_title);
+
+my $inverted;
+if (defined $artist)
+{
+	if ( $artist =~ /^(\S+?) (\S+?)$/ and lc($1) ne 'the')
+	{
+		$inverted = "$2, $1";
+		unless ( prompt -yd => 'n', "Invert names like so? $inverted  " )
+		{
+			undef $inverted;
+		}
+	}
+	$album = $artist eq $album_title ? $inverted // $artist : ($inverted // $artist) . " - $album_title";
+	$album =~ s/^the //i;
+}
+else
+{
+	$album = $album_title;
+}
+debuggit( "creating album:", $album );
+
+=end old_way
+
+=cut
+
+# new way: just make a pointless albumname for the dir and let fixup_album take care of the hard stuff
+$album = "Xnew";
+
+
+# okay, now make the dir
+
+# have to do this before we chdir
+$zip = $zip->absolute;
+
+my $albumdir = album(dir => $album);
+mkdir $albumdir;
+chdir $albumdir;
+
+# this should work because we have an absolute path at this point
+system( unzip => $zip );
+
+
+# handle coverfile, if any
+my $cover = glob("*.jpg");
+$cover //= glob("*.jpeg");
+debuggit(2 => "coverfile is", $cover);
+if ($cover)
+{
+	debuggit(5 => "trying to rename coverfile");
+	move $cover, cover_file($albumdir, '.jpg');
+}
+
+
+unlink $_ foreach glob('*.txt');
+
+# let fixup_album do all the hard work
+# (but don't run chkalbum; we'll do that ourselves at the end
+system(qw< fixup_album -C >, $albumdir);
+# this is cheating a bit, but it's the quickest/easiest way to see what dir fixup_album created
+my $new_albumdir = `newest -bx1`;
+chomp $new_albumdir;
+
+say "\nThe new album dir is shown above.";
+say "Please use kID3 to tweak the files as necessary.";
+say "Press RETURN when ready to continue.";
+scalar <STDIN>;
+
+# remake the tracklist, JIC they changed something via kID3
+generate_tracklist($new_albumdir);
+
+# get rid of the zip file
+unlink $zip;
+
+# finally, run chkalbum for visual confirmation
+system('chkalbum', album(tracklist => $new_albumdir));

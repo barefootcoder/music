@@ -1,0 +1,17 @@
+#!/usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use MP3::Tag;
+
+use Music;
+
+
+my $tracklist = shift;
+my $tracklist_file = $TRACKLIST_DIR->file('misc', "$tracklist.m3u");
+die("won't overwrite $tracklist_file") if -e $tracklist_file;
+
+open(OUT, ">$tracklist_file");
+say OUT file($_)->absolute foreach sort_tracklist(@ARGV);
+close(OUT);

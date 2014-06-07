@@ -1,0 +1,16 @@
+#! /usr/bin/env perl
+
+use myperl;
+
+use File::Basename;
+
+use Music;
+
+
+$ARGV[0] =~ s@/$@@;
+my $album = basename($ARGV[0], ".m3u");
+$album =~ /^(.+?) (.*) - (.*)$/;
+my $new_album = "$2, $1 - $3";
+
+chdir(dirname($ARGV[0]));
+rename_album($album, $new_album);

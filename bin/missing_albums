@@ -1,0 +1,16 @@
+#! /usr/bin/env perl
+
+use myperl;
+
+use Music;
+
+
+my $tldir = $TRACKLIST_DIR->subdir('Albums');
+while (my $file = $tldir->next)
+{
+	if ($file->basename =~ /(.*)\.m3u$/)
+	{
+		my $name = $1;
+		warn("$name has a tracklist but no album dir\n") unless -d $ALBUM_DIR->subdir($name);
+	}
+}

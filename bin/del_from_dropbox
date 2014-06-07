@@ -1,0 +1,38 @@
+#! /bin/bash
+
+funcs=$MUSICHOME/bin/functions
+[[ -r $funcs ]] || { echo "$0: can't load functions" >&2 && exit 1; }
+. $funcs
+
+if [[ $ARGTYPE != tracklist && ! -d $ARG ]]
+then
+	echo "$me: pass me a directory or tracklist to delete" >&2
+	exit 2
+fi
+
+
+function maybe_rm
+{
+	if [[ -z $(fgrep -r "$track" $(tracklist "[RPMm]?[nrox]*") | grep -v "^$(tracklist $ARG)") ]]
+	then
+		file="${typedirs[Dropbox]}/$track"
+		rm -v "$file" 2>/dev/null
+
+		dir="$(dirname "$file")"
+		if [[ -z $(ls "$dir" 2>/dev/null) && $? == 0 ]]
+		then
+			rmdir -v "$dir" 2>/dev/null
+		fi
+	fi
+}
+
+if [[ -d $ARG ]]
+then
+	for file in $ARG/*
+	do
+		track=$file
+		maybe_rm
+	done
+else
+	foreach_track "$ARG" "maybe_rm"
+fi

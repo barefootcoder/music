@@ -1,0 +1,32 @@
+#! /usr/bin/env perl
+
+use myperl;
+
+use Data::Printer;
+use File::Glob 'bsd_glob';
+
+use Music;
+
+
+# lots of "secret operators" here ... try a CPAN search for perlsecret if you get lost
+
+my %albums = gather
+{
+	foreach (bsd_glob("$DROPBOX_DIR/Albums/*"))
+	{
+		(my $album = $_) =~ s{$DROPBOX_DIR/Albums/}{};
+		no warnings qw< numeric uninitialized >;
+		my $tracks = 0+ qx{ wc -l "@{[ album(tracklist => $album) ]}" };
+		my $files =()= bsd_glob("\Q$_\E/*");
+		debuggit(4 => "album", $album, ':', $tracks, "tracks,", $files, "files");
+		take ($_, $tracks) if $tracks == $files;
+	}
+};
+
+foreach (qx< ls -dltr @{[ map { qq{"$_"} } keys %albums ]} >)
+{
+	my ($album) = m{($DROPBOX_DIR/Albums/.*)};
+	s{$DROPBOX_DIR/Albums/}{};
+	s/^(\S+\s+){5}/ sprintf("%2d tracks  ", $albums{$album}) /e;
+	print;
+}

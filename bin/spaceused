@@ -1,0 +1,18 @@
+#! /bin/bash
+
+function get_dirlinks
+{
+	OIFS="$IFS"
+	IFS="
+"
+	declare -i i=0
+	for file in $(find . -maxdepth 1 -type l -xtype d -not -name ".*" ; find . -mindepth 1 -maxdepth 1 -type d)
+	do
+		files[$((i++))]="$file"
+	done
+}
+
+cd $MUSICHOME
+declare -a files
+get_dirlinks
+du -scHh "${files[@]}" | sortk

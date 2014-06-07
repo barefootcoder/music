@@ -1,0 +1,62 @@
+#! /usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use File::Next;
+use File::Basename;
+
+use Music;
+
+
+my $pattern = shift;
+$pattern =~ s/\.m3u$//;
+my @mixes = grep { m{\Q$pattern\E[^/]*\.m3u}i } glob("$ENV{MUSICHOME}/tracklists/[CRPMm]*/*.m3u");
+usage_error("no such mix [$pattern]") if @mixes == 0;
+fatal_error("multiple candidates:", map { "\t$_" } @mixes, "please narrow it down") if @mixes > 1;
+
+my $mix = $mixes[0];
+say "Adding to mix: $mix";
+
+const my $SEP => qr/ - /;
+my @files;
+foreach (@ARGV)
+{
+	debuggit(4 => "current arg is", $_);
+	if (m{/} and not m{//})
+	{
+		fatal_error("no such file [$_]") unless -r;
+	}
+	else
+	{
+		# must be a pattern
+		my $artist = s{^(.*)//}{} ? ".*?$1.*?" : qr/.*?/;
+		my $anchor_front = s/^:// ? '' : qr/.*?/;
+		my $anchor_back = s/:$// ? '' : qr/.*?/;
+		my $pattern = qr/$artist$SEP$anchor_front\Q$_\E$anchor_back\.mp3/i;
+		debuggit(2 => "pattern:", $pattern);
+
+		my $finder = File::Next::files( { file_filter => sub { /$pattern/ } },
+				"$ENV{MUSICHOME}/Albums", "$ENV{MUSICHOME}/Singles");
+		my @candidates;
+		push @candidates, $_ while $_ = $finder->();
+		if (@candidates == 0)
+		{
+			fatal_error("can't find songs matching $pattern");
+		}
+		elsif (@candidates > 1)
+		{
+			fatal_error("too many candidates [" . join(', ', map { basename($_) } @candidates) . "]");
+		}
+		else
+		{
+			$_ = $candidates[0];
+		}
+	}
+	push @files, file($_)->absolute;
+}
+debuggit(3 => "going to add files:", DUMP => \@files);
+
+open(OUT, ">>$mix");
+say && say OUT foreach @files;
+close(OUT);

@@ -1,0 +1,38 @@
+#! /usr/bin/env perl
+
+use myperl;
+
+use WWW::Mechanize;
+use File::Glob qw<bsd_glob>;
+
+use Music;
+
+
+const our $BASE_URL => 'http://www.amazon.com/s/?url=search-alias%3Ddigital-music&field-keywords=';
+
+
+while ( <> )
+{
+	chomp;
+	say '' and next if /^#\s*cut/;
+	my @parts = split('/');
+	die("can't parse path $_") unless @parts >= 4 and $parts[1] eq 'export' and $parts[2] eq 'music';
+
+	my $album;
+	if ($parts[3] eq 'Albums')
+	{
+		$album = $parts[4];
+		$album =~ s/^(.+) - //;
+	}
+	$parts[-1] =~ s/\.mp3$//;
+	my ($artist, $song) = split(/ - /, $parts[-1]);
+
+	my $url = $BASE_URL . join('+', $artist, $album // (), $song);
+	$url =~ s/ /+/g;
+	say "$url";
+
+	my $m = WWW::Mechanize->new;
+	$m->get($url);
+	my $link = $m->find_link( class => 'title' );
+	say $link ? $link->url : "# can't find link for $artist - $song";
+}

@@ -1,0 +1,45 @@
+#!/bin/bash
+
+funcs=$MUSICHOME/bin/functions
+[[ -r $funcs ]] || { echo "$0: can't load functions" >&2 && exit 1; }
+. $funcs
+
+
+if [[ $LOCALHOSTNAME == winterfell || $LOCALHOSTNAME == axis ]]
+then
+	if [[ $ARGTYPE != tracklist ]]
+	then
+		echo "$me: pass me a tracklist to watch" >&2
+		exit 2
+	fi
+
+
+	total_tracks=$(cat "$(tracklist "$ARG")" | grep -v '^#' | wc -l)
+	echo ''
+	while [[ 1 ]]
+	do
+		track_count=0
+		foreach_track "$ARG" '[[ -r $track ]] && : $(( ++track_count ))'
+		echo -ne "\r$track_count out of $total_tracks"
+		if [[ $track_count -eq $total_tracks ]]
+		then
+			echo -e "\ndone\n"
+			which beep >/dev/null && beep
+			exit
+		fi
+		sleep 2
+	done
+elif [[ $LOCALHOSTNAME == tyr ]]
+then
+	if [[ $ARGTYPE != Dropbox ]]
+	then
+		echo "$me: pass me a Dropbox directory to watch" >&2
+		exit 2
+	fi
+
+
+	:
+else
+	echo "$me: don't know how to watch on host $LOCALHOSTNAME" >&2
+	exit 1
+fi

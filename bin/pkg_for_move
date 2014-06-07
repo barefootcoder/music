@@ -1,0 +1,33 @@
+#! /bin/bash
+
+ferryfile=$MUSICHOME/music_ferry.tbz
+[[ -e $ferryfile ]] && /bin/rm -f $ferryfile
+
+cd $MUSICHOME
+
+if [[ -d "$1" ]]
+then
+	dir="$1"
+
+	section=$(dirname "$dir")
+	if [[ "$section" == Albums ]]
+	then
+		album=$(basename "$dir")
+		tracklist="tracklists/Albums/$album.m3u"
+		coverart=${album// /}
+		if [[ -e covers/$coverart ]]
+		then
+			coverart=covers/$coverart
+		else
+			coverart=
+		fi
+		tar cvpjf $ferryfile "$dir" "$tracklist" $coverart
+	else
+		tar cvpjf $ferryfile "$dir"
+	fi
+else
+	tracklist="$1"
+	IFS="
+"
+	tar cvpjf $ferryfile $(echo "$1" | wye cat "$tracklist" | grep -v '^#' | sed "s@$MUSICHOME/@@")
+fi

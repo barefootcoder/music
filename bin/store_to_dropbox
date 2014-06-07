@@ -1,0 +1,39 @@
+#! /bin/bash
+
+if [[ -z $MUSICHOME ]]
+then
+	echo "$0: cannot operate without MUSICHOME being set" >&2
+	exit
+fi
+
+dbdir=~buddy/Dropbox/music
+if [[ $dbdir -ef $MUSICHOME ]]
+then
+	srcdir=/media/buddy/GreatHall/backup/music 
+	if [[ ! -d $srcdir ]]
+	then
+		echo "$0: can't copy from master to Dropbox because master _is_ Dropbox, and can't find external drive" >&2
+		exit 1
+	fi
+else
+	srcdir=$MUSICHOME
+fi
+
+tracklist=$(realpath "$1")
+cd $srcdir
+
+IFS="
+"
+count=0
+for track in $(cat $tracklist | grep -Pv "^\s*#")
+do
+	newtrack=${track/$MUSICHOME/$dbdir}
+	track=${track/$MUSICHOME/$srcdir}
+	basedir="$(dirname "$newtrack")"
+	mkdir -p "$basedir" 2>/dev/null
+	cp -pv "$track" "$newtrack"
+	count=$((count + 1))
+done
+
+echo -e "\nWaiting on $count tracks."
+echo -e "Try this:\n\twatch_incoming \"$1\"\n"

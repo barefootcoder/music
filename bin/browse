@@ -1,0 +1,17 @@
+#! /usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Term::Menus;
+
+
+my $albumdir="$ENV{MUSICHOME}/Albums";
+# temporary until better work is done
+my $ls_opt = shift eq '-d' ? '-1tr' : '-1';
+system("/bin/ls $ls_opt $albumdir | less");
+exit;
+
+
+my $albums = [ glob("$albumdir/*") ];
+pick($albums, "Choose an album:");

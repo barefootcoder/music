@@ -1,0 +1,18 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+
+my $album_name = "@ARGV";
+my $cddb_file = `grep -i '$album_name' $ENV{HOME}/.cddb/*`;
+
+if ($cddb_file =~ s/\n/\n/ > 1)
+{
+	print "got multiple possibilities:\n$cddb_file";
+	exit;
+}
+
+
+$cddb_file =~ s/:.*$//;
+exec "vim $cddb_file";

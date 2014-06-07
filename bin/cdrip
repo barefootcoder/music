@@ -1,0 +1,156 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+use MP3::ID3Lib;
+use Data::Dumper;
+use CDDB_get qw<get_cddb>;
+use String::Approx qw<amatch>;
+use List::Util qw<first min>;
+
+
+my $cddb_config =
+{
+	CDDB_HOST	=>	'freedb.freedb.org',
+	CDDB_PORT	=>	8880,
+	CDDB_MODE	=>	'cddb',
+	CD_DEVICE	=>	'/dev/cdrom',
+
+	input		=>	1,
+};
+
+my %cd = get_cddb($cddb_config);
+$cd{$_} =~ s/\s+$// foreach keys %cd;
+
+my $track_data = '';
+my $i = 0;
+foreach (@{$cd{track}})
+{
+	$track_data .= sprintf("%02d: $_\n", ++$i);
+}
+
+
+my $dir = "/export/fun/music/Full Albums";
+my $filename = "$cd{artist} - _$cd{title}_";
+my $year = input("What year?");
+
+
+my %genre;
+open(GEN, "lame --genre-list |") or die("can't get genres");
+while ( <GEN> )
+{
+	/(\d+)\s+(.*)\s*$/;
+	$genre{$1} = $2;
+}
+close(GEN);
+my $genre = input("What genre?", $cd{cat},
+	{
+		verify => 1,
+		choices => [ values %genre ],
+		help => sub { printf "%3d: $genre{$_}\n", $_ foreach sort {$a<=>$b} keys %genre },
+	}
+);
+
+
+my $lame = "lame -b 128 --tt '$cd{title}' --ta '$cd{artist}' --tl '(Full Album)' --ty $year --tg '$genre' --add-id3v2 "
+		. "- '$dir/$filename.mp3'";
+
+system("cdparanoia 1- - | bfr | $lame");
+
+
+my $id3 = MP3::ID3Lib->new("$dir/$filename.mp3");
+$id3->add_frame("USLT", $track_data);
+
+
+sub input
+{
+	my ($prompt, $default, $opts) = @_;
+	$opts ||= {};
+
+	my $answer;
+	INPUT:
+	{
+		if ($opts->{menu})
+		{
+			printf "%3d: $opts->{choices}->[$_]\n", $_ + 1 foreach 0..$#{$opts->{choices}};
+		}
+
+		print $prompt;
+		print "  [$default]" if $default;
+		print "  ";
+		$answer = <STDIN>;
+		chomp $answer;
+
+		$answer = $default if $answer eq '';
+		$default = $answer;
+
+		if (exists $opts->{help} and $answer eq '?')
+		{
+			$opts->{help}->();
+			redo INPUT;
+		}
+
+		if (exists $opts->{choices})
+		{
+			if ($opts->{menu})
+			{
+				if ($answer !~ /^\d+$/ or $answer < 0 or $answer > @{$opts->{choices}})
+				{
+					print "Stick to the menu.\n";
+					redo INPUT;
+				}
+				elsif ($answer == 0)
+				{
+					return undef;
+				}
+				else
+				{
+					return $opts->{choices}->[$answer - 1];
+				}
+			}
+			else
+			{
+				my $exact_match = first { lc eq lc($answer) } @{$opts->{choices}};
+				if (defined $exact_match)
+				{
+					$answer = $exact_match;
+				}
+				else
+				{
+					my @possibles = amatch($answer, [ "i" ], @{$opts->{choices}});
+					if (@possibles == 0)
+					{
+						print "Not a valid choice\n";
+						redo INPUT;
+					}
+					elsif (@possibles == 1)
+					{
+						$answer = $possibles[0];
+					}
+					else
+					{
+						my $choice = input("Which one (0 for none of the above)?", 0, { choices => \@possibles, menu => 1 });
+						if ($choice)
+						{
+							$answer = $choice;
+						}
+						else
+						{
+							redo INPUT;
+						}
+					}
+				}
+			}
+		}
+
+		if ($opts->{verify})
+		{
+			print "You chose: $answer\n";
+			print "Is this correct?  [y/N] ";
+			my $yn = <STDIN>;
+			redo INPUT unless $yn =~ /^y/i;
+		}
+	}
+	return $answer;
+}

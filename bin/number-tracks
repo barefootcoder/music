@@ -1,0 +1,80 @@
+#! /usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie ':all';
+
+use WWW::Mechanize;
+
+use Music;
+
+
+my ($url, $dir) = @ARGV;
+
+my $m = WWW::Mechanize->new;
+$m->get($url);
+my $doc = $m->content();
+($doc) = $doc =~ m{\bid\s*=\s*"?Track_listing\b(.*?)</table>}s;
+$doc =~ s{<.*?>}{}sg;
+debuggit(4 => "doc is", $doc);
+
+my $albumdir = dir($dir);
+my @tracks = grep { -f } $albumdir->children();
+my (%tracks, %trackfiles);
+foreach my $track (@tracks)
+{
+	my $tag = MP3::Tag->new($track);
+	my $data = $tag->autoinfo;
+	my $title = $data->{title};
+	$trackfiles{$title} = $tag;
+	debuggit(3 => "working on", $title);
+
+	# find all the clashing keys
+	my @clashes = grep { my $l = substr($_,0,1); $title =~ /^$l/i } keys %tracks;
+	if (@clashes)
+	{
+		my $maxlen = 0;
+		foreach my $clash (grep { my $l = substr($_,0,1); $title =~ /^$l/i } keys %tracks)
+		{
+			# so figure out how long a prefix we need not to clash any more
+			my $len = 1;
+			++$len while lc substr($title, 0, $len) eq lc substr($tracks{$clash}, 0, $len);
+			# out with the old, in with the new
+			# but only if the new length is _bigger_ than the old one
+			if ($len > length($clash))
+			{
+				my $prefix = substr($tracks{$clash}, 0, $len);
+				$tracks{$prefix} = delete $tracks{$clash};
+			}
+
+			# length of prefix for the new track is the longest length we find here
+			$maxlen = max($maxlen, $len);
+		}
+
+		# now add the new track (shouldn't clash any more)
+		my $prefix = substr($title, 0, $maxlen);
+		die("something went very very wrong: $prefix => $tracks{$prefix}") if exists $tracks{$prefix};
+		$tracks{$prefix} = $title;
+	}
+	else
+	{
+		# just jam it in there with one letter
+		my $prefix = substr($title, 0, 1);
+		$tracks{$prefix} = $title;
+	}
+	debuggit(4 => "after processing, struct is", DUMP => \%tracks);
+}
+
+foreach (sort keys %tracks)
+{
+	my $title = $tracks{$_};
+	my $find = qr/(\d+)\.\s*"?$_/i;
+	if ($doc =~ /$find/)
+	{
+		say "$title is track $1";
+		$trackfiles{$title}->update_tags({ track => $1 });
+	}
+	else
+	{
+		say "couldn't find $find";
+	}
+}

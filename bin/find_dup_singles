@@ -1,0 +1,31 @@
+#! /usr/bin/env perl
+
+use myperl DEBUG => 1;
+
+use Music;
+
+
+my %found;
+while (my $file = $SINGLES_DIR->next)
+{
+	if ($file =~ m{/([^/]+)\.mp3$})
+	{
+		my $track = $1;
+		if (my @tracks = `ls $ALBUM_DIR/*/"$track.mp3" 2>/dev/null`)
+		#if (my @tracks = `ls "$ALBUM_DIR/*/$track.mp3" `)
+		{
+			$found{$track} = [ map { file($_)->dir->basename } @tracks ];
+		}
+	}
+}
+
+
+if (%found)
+{
+	say "Found some duplicated tracks:\n";
+	foreach (sort keys %found)
+	{
+		say;
+		say "  [also in] $_" foreach @{$found{$_}};
+	}
+}

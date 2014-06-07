@@ -1,0 +1,21 @@
+#! /usr/bin/env perl
+
+use strict;
+use warnings;
+
+use File::Basename;
+
+use Music;
+
+
+$ARGV[0] =~ s@/$@@;
+my $album = basename($ARGV[0], ".m3u");
+my $new_album = $album;
+$new_album =~ s/^The //;
+if ($album eq $new_album)
+{
+	print STDERR "No 'The' found at the beginning of the artist name\n";
+	exit 1;
+}
+
+rename_album($album, $new_album);

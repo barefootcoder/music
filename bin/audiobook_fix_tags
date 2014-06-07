@@ -1,0 +1,96 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+use Getopt::Std;
+use File::Basename;
+
+use Debuggit;
+
+use Music;
+
+$| = 0;
+
+
+my $opts = {};
+getopts('y:fFq', $opts);
+
+
+print "\n";
+fix_tags($_) foreach @ARGV;
+
+
+sub fix_tags
+{
+	my ($mp3) = @_;
+	print "file: $mp3", $opts->{q} ? "\t\t" : "\n";
+
+	-f $mp3 or die("must supply mp3 files as args\n");
+	my @fileparts = realpath($mp3);
+	my $suffix = pop @fileparts;
+	$suffix eq '.mp3' or die("file $mp3 is not a .mp3 file\n");
+
+	my $correct = {};
+	$correct->{title} = pop @fileparts;
+	$correct->{album} = pop @fileparts;
+	$correct->{artist} = pop @fileparts;
+	@{$correct}{qw< track title >} = $correct->{title} =~ m{^ (\d+) \s+ - \s+ (.*) $}x;
+	$correct->{year} = $opts->{y} if exists $opts->{y};
+	$correct->{genre} = 'Spoken Word';
+	debuggit(2 => 'correct data', DUMP => $correct);
+
+	my $tag = get_tags($mp3);
+	debuggit(2 => 'existing data', DUMP => $tag);
+	my $new_tag = {};
+	foreach ( qw< title artist album genre > )
+	{
+		$tag->{$_} = '' unless defined $tag->{$_};
+		$new_tag->{$_} = $correct->{$_} unless $tag->{$_} eq $correct->{$_};
+	}
+	foreach ( qw< track year > )
+	{
+		if (exists $correct->{'year'})
+		{
+			$tag->{$_} = 0 unless defined $tag->{$_};
+			$new_tag->{$_} = $correct->{$_}+0 unless $tag->{$_} == $correct->{$_};
+		}
+	}
+
+	if (%$new_tag)
+	{
+		if ($opts->{q})
+		{
+			print "Fixing.\n";
+		}
+		else
+		{
+			print "Will transform:\n";
+			print "\t$_ : $tag->{$_} => $new_tag->{$_}\n" foreach sort keys %$new_tag;
+		}
+		unless ($opts->{f})
+		{
+			print "\nIs this correct? [y/N] ";
+			unless (<STDIN> =~ /^[yY]/i)
+			{
+				exit;
+			}
+		}
+
+		set_tags($mp3, $new_tag, { REMOVE_FIRST => $opts->{F} });
+	}
+	else
+	{
+		if ($opts->{F})
+		{
+			print "Forcing.\n";
+			set_tags($mp3, {}, { REMOVE_FIRST => 1 });
+		}
+		else
+		{
+			print "Nothing to transform.\n";
+		}
+	}
+
+	print "\n" unless $opts->{q};
+}

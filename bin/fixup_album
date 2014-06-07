@@ -1,0 +1,305 @@
+#!/usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use MP3::Tag;
+use Getopt::Std;
+
+use Music;
+
+
+my $opts = {};
+getopts('ynpCh', $opts);
+
+if ($opts->{'h'})
+{
+	say STDERR qq{usage: $0 [-yn] "Albums/Some Artist - Some Album/"};
+	say STDERR qq{          -y : Assume "yes" to all questions (implies -n)};
+	say STDERR qq{          -n : No tweaking of track data (retain comments, don't force title case, etc)};
+	say STDERR qq{          -p : Pause before generating tracklist (for manual tweaking via kID3)};
+	say STDERR qq{          -C : Don't run `chkalbum` after completion (default: run chkalbum to verify work)};
+	exit;
+}
+# if you want to take defaults, you also don't want tweaking
+$opts->{'n'} = 1 if $opts->{'y'};
+
+my $albumdir = dir(shift);
+unless (-d $albumdir and $albumdir->dir_list(-2) eq 'Albums')
+{
+	usage_error("I need an album directory to fixup");
+}
+$albumdir = $albumdir->dir_list(-1);
+
+my $url;
+$url = shift if @ARGV;
+
+
+# fixup all tracks
+chdir album(dir => $albumdir);
+#warn("albumdir is $albumdir and pwd is ", dir()->absolute);
+
+my $cover = album(cover => $albumdir);
+warn("got coverfile $cover");
+my $image;
+if (-f $cover)
+{
+	$image = binslurp($cover);
+}
+
+my $album_data;
+foreach my $file (glob('*'))
+{
+	my ($tag, $track_data) = id3_data($file);
+	unless ($album_data)
+	{
+		$album_data = album_data($track_data, $albumdir);
+
+		progress_msg("adjust track names");
+	}
+
+	progress_msg('.');
+
+	# fixup album, artist, and song title
+	$track_data->{$_} = $album_data->{$_} foreach qw< album year genre >;
+	$track_data->{'artist'} = $album_data->{'artist'} if $album_data->{'artist'};
+
+	# tweak some stuff, unless we're doing a re-pass and the user says don't adjust
+	unless ($opts->{'n'})
+	{
+		# fixup hideous Jamendo track titles
+		$track_data->{'title'} =~ s/^.*? - \d\d - //;
+		# do title case on song title and song artist
+		$track_data->{'title'} = title($track_data->{'title'});
+		# but don't try to mess with an album artist if it's not a multi-artist album
+		$track_data->{'artist'} = title($track_data->{'artist'}) unless $album_data->{'artist'};
+
+		# make sure track is just a number (no leading zeroes, no trailing crap)
+		my $track = $track_data->{'track'};
+		die("one or more of your tracks isn't numbered") unless $track;
+		$track =~ /^(\d+)/;													# get rid of trailing crap
+		$track = $1 + 0;													# get rid of leading zeroes
+		$track_data->{'track'} = $track;
+
+		# blank out comment
+		# it's usually some promotional crap
+		$track_data->{'comment'} = '';
+	}
+
+#use Data::Printer; my $h = $tag->get_id3v2_frame_ids; p $h;
+	# remove useless frames:
+	#	*	TENC = encoded by (always useless)
+	#	*	TLAN = language (nearly always useless)
+	#	*	TPE2 = performer/album artist (almost always redundant)
+	#	*	TCOM = composer (useless more often than not)
+	#	*	TPUB = publisher (a.k.a. label or copyright holder; useless)
+	#	*	TCOP = copyright (useless and mostly blank)
+	#	*	TPOS = disc number (occasionally useful, but mostly just set to 1/1, which is useless)
+	#	*	TDRC = recording time (appears to be redundant with TYER, and usually blank)
+	#	*	PRIV = software crap (always useless)
+	#	*	TPRI = not even a real frame title (presumably used for more useless crap)
+	#	*	TXXX = user-defined (seems to mostly be email addresses; always useless so far)
+	#	*	TDTG = tagging time (utterly useless, and usually blank)
+	#	*	WOAF = URL for each file (not particularly useful)
+	#	*	WOAS = URL for the album (not particularly useful)
+	#	*	WCOP = URL for the copyright (definitely not useful)
+	#	*	WPUB = URL for the publisher (definitely not useful)
+	#	*	WCOM = commercial URL (definitely not useful)
+	#	*	MCDI = some long-ass numbers we don't need (useless)
+	#	*	COMM(eng)[iTunes_CDDB_IDs] = iTunes crap (obviously, and obviously useless)
+	#	*	COMM(eng)[ID3 v1 Comment] = who knows?  usually blank
+	foreach (qw< TENC TLAN TPE2 TCOM TPUB TCOP TPOS TDRC PRIV TPRI TXXX TDTG WOAF WOAS WCOP WPUB WCOM MCDI
+					COMM(eng)[iTunes_CDDB_IDs] >, 'COMM(eng)[ID3 v1 Comment]')
+	{
+		$tag->select_id3v2_frame_by_descr($_, undef);
+	}
+
+	# create ID3v2 tag if necessary
+	# (otherwise adding pic [below] will fail)
+	$tag->update_tags($track_data, 1);
+
+	# add cover pic (if any)
+	attach_album_art($tag, $image) if $image;
+
+	my $trackname = $tag->interpolate('%a - %t%E');
+	rename $file, filename($trackname) unless $file eq filename($trackname);
+}
+
+chdir $MUSICHOME;
+
+# change dirname if necessary
+my $newalbumdir = $album_data->{'dirname'};
+if ($newalbumdir ne $albumdir)
+{
+	progress_msg("adjusting album name");
+
+	rename album(dir => $albumdir), album(dir => $newalbumdir);
+
+	# better get rid of the old tracklist before we make the new one (below) and end up with two
+	my $old_tracklist = album(tracklist => $albumdir);
+	unlink $old_tracklist if -f $old_tracklist;
+
+	# we can ditch the coverfile because we've saved the image with all the tracks
+	unlink $cover if -f $cover;
+}
+
+# pause, if requested
+if ($opts->{'p'})
+{
+	say "\nNew album dir: $newalbumdir";
+	say "Please use kID3 to tweak the files as necessary.";
+	say "Press RETURN when ready to continue.";
+	scalar <STDIN>;
+}
+
+# finally, create tracklist
+progress_msg("creating tracklist");
+generate_tracklist($newalbumdir);
+
+# and we're done
+progress_msg("done");
+say STDERR '';
+
+# report new album name in case our caller wants it
+say $newalbumdir;
+
+# finally, run chkalbum as a visual check of what we've done (unless user doesn't want us to)
+system('chkalbum', album(tracklist => $newalbumdir)) unless $opts->{C};
+
+
+func get_input ($msg, $default //='', $xform?)
+{
+	my $answer;
+	INPUT:
+	{
+		say "  Editing: <-- ^B  --> ^F  TAB edit default";
+		$answer = prompt "$msg: [$default]", -def => $default, -complete => [ $default ];
+
+		my $check = $answer;
+		$check .= " => " . $xform->($answer) if $xform;
+
+		$default = "$answer";											# remove Damian magic by stringifying
+		redo INPUT unless prompt -y1, "$check :: Correct?";
+	}
+	return "$answer";													# remove Damian magic by stringifying
+}
+
+
+func progress_msg ($msg)
+{
+	state $started = 0;
+	unless ($started)
+	{
+		# preparation for progress messages
+		say STDERR '';
+		$started = 1;
+	}
+
+	if ($msg eq '.')
+	{
+		print STDERR '.';
+	}
+	else
+	{
+		print STDERR "\r", ' ' x 80;
+		print STDERR "\r$ME: $msg ";
+	}
+}
+
+
+func binslurp ($file)
+{
+	open(my $fh, $file);
+	binmode $fh;
+	return slurp $fh;
+}
+
+
+func id3_data ($file)
+{
+	my $tag = MP3::Tag->new($file);
+	die("couldn't make tag: $!") unless $tag;
+
+	my $data = $tag->autoinfo;
+	$tag->config( write_v24 => 1 );
+
+	return wantarray ? ($tag, $data) : $data;
+}
+
+
+func album_data (HashRef $tdata, $albumdir)
+{
+	use Array::Columnize;
+	const my $VA => 'va';												# multi-artist album flag
+
+	my $adata = {};
+	my ($ost, $invert_name);
+
+	if ($opts->{'y'})
+	{
+		# artist first, as it's tougher
+		given ($albumdir)
+		{
+			when (/\[Soundtrack\]$/)
+			{
+				# soundtrack: that means multi-artist, so don't add the artist to $adata
+			}
+			when ($_ eq alpha_filename($tdata->{'artist'}))
+			{
+				# album is the same name as the artist: eponymous album
+				$adata->{'artist'} = $tdata->{'artist'};
+			}
+			when (/ - /)
+			{
+				# has form "artist - album": definitely not multi-artist
+				$adata->{'artist'} = $tdata->{'artist'};
+			}
+			default
+			{
+				# has no artist: must be non-soundtrack multi-artist
+				# don't add artist to $adata
+			}
+		}
+
+		# everything else we just leave as is
+		$adata->{$_} = $tdata->{$_} foreach qw< album year genre >;
+		$adata->{'dirname'} = $albumdir;
+	}
+	else
+	{
+		$adata->{'artist'} = get_input("Artist name ['$VA' for multi-artist]", title($tdata->{'artist'}));
+		$adata->{'artist'} eq $VA ? ($ost = prompt -y1, "Soundtrack?")
+				: $adata->{'artist'} =~ / / ? ($invert_name = prompt -y1, "Invert names?") : ();
+		$adata->{'album'} = get_input("Album name", title($tdata->{'album'}));
+		$adata->{'year'} = get_input("Release year", $tdata->{'year'});
+
+		GENRE:
+		{
+			my $count = 0;
+			tie my %genres, 'Tie::IxHash', map { ++$count => $_ } sort @{ MP3::Tag->genres };
+			my ($cols) = Term::ReadKey::GetTerminalSize();
+			print columnize([ map { sprintf("%3d. %s", $_, $genres{$_}) } keys %genres ], { displaywidth => $cols });
+			my $g = prompt -integer => [0..$count], -def => 0, "Genre: [@{[$tdata->{'genre'}//'']}]";
+			$adata->{'genre'} = "$g" ? $genres{$g} : $tdata->{'genre'};
+			redo GENRE unless prompt -y1, "$adata->{'genre'} :: Correct?";
+		}
+
+		my $albumname;
+		if ($adata->{'album'} eq $adata->{'artist'} or $adata->{'artist'} eq $VA)
+		{
+			$albumname = $ost ? "$adata->{'album'} [Soundtrack]" : $adata->{'album'};
+		}
+		else
+		{
+			$albumname = "$adata->{'artist'} - $adata->{'album'}";
+		}
+		$adata->{'dirname'} = alpha_filename($albumname, invert => $invert_name);
+
+		say '';
+		say "--try again--" until prompt -y1, "Album dir: $adata->{'dirname'} :: Correct?";
+
+		delete $adata->{'artist'} if $adata->{'artist'} eq $VA;
+	}
+
+	return $adata;
+}

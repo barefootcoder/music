@@ -1,0 +1,19 @@
+setenv HOME /home/$USER
+unalias cd
+source ~/.tcshrc
+
+setenv MUSICHOME /export/music
+set path = ( $path $MUSICHOME/bin )
+setenv PERL5LIB `addpath -b PERL5LIB $MUSICHOME/bin`
+
+alias cd 'setenv OLDHOME $HOME ; setenv HOME $MUSICHOME ; chdir \!* ; setenv HOME $OLDHOME ; unsetenv OLDHOME'
+alias fx 'echo -e "\n\n" ; ff \!^ | egrep -i "\<\!^\>"'
+alias resrc 'source $MUSICHOME/bin/musicsh'
+
+complete sunzip 'p/1/f:*.zip/'
+
+# perlbrew setup
+#if ( -e ~/perl5/perlbrew/etc/cshrc ) then
+#    setenv PERLBREW_PERL perl-5.14.2
+#    source ~/perl5/perlbrew/etc/cshrc
+#endif

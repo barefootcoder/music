@@ -1,0 +1,21 @@
+#!/usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use Music;
+
+
+my ($src, $dest) = @ARGV;
+die("must supply valid source file") unless $src and -r $src;
+die("must supply valid destination file") unless $dest and -w $dest;
+
+my $new_image = extract_album_art($src);
+die("can't get image out of source file: $src") unless $new_image;
+
+my $old_image = extract_album_art($dest);
+if ($old_image)
+{
+	exit unless confirm "There appears to be an existing image.  Overwrite it?";
+}
+attach_album_art($dest, $new_image);

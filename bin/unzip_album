@@ -1,0 +1,36 @@
+#!/bin/bash
+
+funcs=$MUSICHOME/bin/functions
+[[ -r $funcs ]] || { echo "$0: can't load functions" >&2 && exit 1; }
+. $funcs
+
+album="${ARG%.zip}"
+if [[ ! ( $ARGTYPE == Dropbox && $album != $ARG ) ]]
+then
+	usage_error "pass me a .zip file in the Dropbox dir"
+fi
+album="$(basename "$album")"
+zipfile="$(dropbox_file "$ARG")"
+
+
+albumdir="$(album dir "$album")"
+mkdir "$albumdir"
+cd "$albumdir"
+
+unzip "$zipfile"
+coverfile="${album// /}"
+tmpfile=/tmp/$$.jpg
+mv folder.jpg $tmpfile
+
+# album name might change
+album="$(fixup_album "$albumdir")"
+if [[ $? -gt 0 ]]
+then
+	die "call to fixup_album failed"
+fi
+albumdir="$(album dir "$album")"
+cd "$albumdir"
+
+mv $tmpfile "$(album cover "$album")"
+
+rm -v "$zipfile"

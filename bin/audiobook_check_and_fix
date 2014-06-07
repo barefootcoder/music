@@ -1,0 +1,24 @@
+#! /bin/bash
+
+function die
+{
+	echo "$@" >&2
+	exit 1
+}
+
+if [[ -z $(ls *$1*) ]]
+then
+	die "can't access pattern *$1*"
+fi
+
+if [[ -z $2 ]]
+then
+	die "have to specify copyright year as 2nd arg"
+fi
+
+audiobook_consistentize *$1* || die "failure to achieve filename consistency"
+audiobook_fix_tags -fqy $2 *$1*/*.mp3 | grep -v 'Nothing to transform'
+find *$1* -name '*.mp3' | wc -l
+find *$1* -name '*.mp3' | each -q 'file {}' | sed 's/.*://' | uniq -c
+MP3='\.mp3:$'
+mp3check -eS *$1*/*.mp3 | fgrep -vx 'valid id3 tag trailer v1.1 found' | grep -v "$1.*/.*$MP3" | grep -v "\.\.\..*/.*$MP3"

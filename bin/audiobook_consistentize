@@ -1,0 +1,120 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+use File::Basename;
+use File::Glob 'bsd_glob';
+
+use Debuggit (DEBUG => 0);
+
+$| = 0;
+
+
+print "\n";
+fix_dir($_) foreach @ARGV;
+
+
+sub fix_dir
+{
+	my ($dir) = @_;
+
+	-d $dir or die("must supply dirname as first arg\n");
+
+	$dir =~ s@/$@@;
+	$dir =~ s@^@./@ if dirname($dir) eq '.' and $dir !~ m@^\./@;
+
+	my $album = basename($dir);
+	$album =~	/^
+					(.*?)
+					(?: \s+ -)? \s+
+					[(\[] [Dd]is[ck] \s+ (\d+) (?: \s+ of \s+ \d+)? [)\]] \s*
+				$/x
+			or die("can't determine dirname pattern ($dir)\n");
+	$album = sprintf("%s/%s [Disc %02d]", dirname($dir), $1, $2);
+
+	if ($dir ne $album)
+	{
+		print "transforming dir: $dir => $album\n";
+		rename $dir, $album or die("can't rename dir to $album");
+	}
+	else
+	{
+		print "dir: $album\n";
+	}
+
+	#print "globbing $album/*\n";
+	my %files;
+	opendir DIR, $album or die("can't open dir $album");
+	for my $file (readdir(DIR))
+	{
+		next if $file =~ /^\./;
+		# The Intro and Credits tracks are special exceptions to the filename patterns below.
+		next if $file eq '01 - Intro.mp3';
+		next if $file =~ /^\d\d - Credits\.mp3$/;
+
+		# Examples of filenames to be converted:
+		# 07 - Christmas on the Closed Ward 7.mp3
+		# 01 - Chapter 26 - the Cave [7 of 7].mp3
+		# 02 - Will and Won't (02.mp3
+		# 01 - Ch. 01 - the Other Minister (01).mp3
+		# 01 - Chapter 23b - Malfoy Manor 2.mp3
+		# 01 - Chapter 29-A - the Phoenix Lament 1.mp3
+		# 01 - 18-The Seven Potters 1.mp3
+		# 01 - y 6 Ch 15 09. 01 the Unbreakable Vow 4.mp3
+		# 01 - y 5 Ch 02 a Peck of Owls 02. 01.mp3
+		# 01 - Cd04 the Ministry of Magic Ch 07-01.mp3
+		# 01 - Ch16 in the Hog's Head 07.mp3
+		# 01 - Ch 21. 07 the Eye of the Snake.mp3
+		# NOTE! Always use the last number for sequence unless it isn't there.
+		# However, if there _is_ no number at the end (e.g. last example), use the number just before the
+		# chapter name.  If neither number is there, it's an error.
+		debuggit(2 => "file:", $file);
+		$file =~ /^
+					(\d+ \s+ - \s+)
+					(?:
+						(?: .*? C[dh] (?: \s* \d+ \. \s* )? )? \s* (\d+) \s+
+					|	.*? \d (?: -? \w+)? \s* [.-] \s*
+					)?
+					(.*?) \s*
+					(?:
+						(?: C[dh] \s* \d+ \s* )? - \s*
+					|	\d+ \. \s*
+					)?
+					[(\[]? 0?(\d+)? (?: \s* of \s* \d+)? [)\]]? \s*
+					\.mp3
+				$/x
+					or die("can't determine filename pattern: $file\n");
+		debuggit(3 => "1:", $1, "// 2:", $2, "// 3:", $3, "// 4:", $4);
+		#print STDERR join(' ', "1:", $1, "// 2:", $2, "// 3:", $3, "// 4:", $4), "\n";
+		my $num = $4 || $2 or die("can't determine sequence number\n");
+		$num += 0;
+
+		debuggit(4 => "file:", $file, "base:", $1, "num:", $2);
+		my $newfile = "$1\u$3 [$num].mp3";
+		$files{$file} = $newfile unless $file eq $newfile;
+	}
+	close(DIR);
+
+	if (%files)
+	{
+		print "Will transform:\n";
+		print "\t$_ => $files{$_}\n" foreach sort keys %files;
+		print "\nIs this correct? [y/N] ";
+		unless (<STDIN> =~ /^[yY]/i)
+		{
+			exit;
+		}
+	}
+	else
+	{
+		print "Nothing to transform.\n";
+	}
+
+	rename "$album/$_", "$album/$files{$_}" foreach keys %files;
+
+	print "\n";
+	system('ls', $album);
+	print "\nPress RETURN ...\n";
+	<STDIN>;
+}

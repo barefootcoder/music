@@ -1,0 +1,148 @@
+# stuff that we want in many of our bash scripts
+
+readonly me=${0##*/}
+
+if [[ -z $MUSICHOME ]]
+then
+	echo "$me: cannot operate without MUSICHOME being set" >&2
+	exit
+fi
+
+if ! echo $PERL5LIB | grep -q $MUSICHOME
+then
+	export PERL5LIB="$PERL5LIB:$MUSICHOME/bin"
+fi
+
+cd $MUSICHOME
+
+
+# errors and stuff
+function die
+{
+	msg="$1"
+	echo "$me: $msg" >&2
+	exit 1
+}
+
+function usage_error
+{
+	msg="$1"
+	echo "$me: $msg" >&2
+	echo "     (not $ARG)" >&2
+	echo "     ($me -h for help)" >&2
+	exit 2
+}
+
+
+# set $IFS to newline only
+# this is necessary in several spots, but caveat codor!
+IFS="
+"
+
+declare -a argtypes
+argtypes[0]=tracklist
+argtypes[1]=album
+argtypes[2]=base
+argtypes[3]=Dropbox
+
+declare -A typedirs
+dbdir=~buddy/Dropbox/music
+typedirs[tracklist]=$(realpath $MUSICHOME/tracklists)
+typedirs[album]=$(realpath $MUSICHOME/Albums)
+typedirs[base]=$MUSICHOME
+typedirs[Dropbox]=$dbdir
+
+
+# normalize argument
+if [[ $NOARG != 1 ]]
+then
+	ARGTYPE=
+	ARG="$1"
+	if [[ -z $ARG ]]
+	then
+		echo "$me: must supply argument to operate on" >&2
+		exit 2
+	fi
+
+	ARG="$(realpath "$ARG")"
+	if [[ ! -r $ARG ]]
+	then
+		echo "$me: can't read the file: $ARG" >&2
+		exit 2
+	fi
+
+	for type in "${argtypes[@]}"
+	do
+		dir="${typedirs[$type]}"
+		newarg="${ARG##$dir/}"
+		if [[ $newarg != $ARG ]]
+		then
+			ARGTYPE=$type
+			ARG=$newarg
+			break
+		fi
+	done
+
+	if [[ -z $ARGTYPE ]]
+	then
+		echo "$me: I have no idea what '$1' is" >&2
+		exit 2
+	fi
+fi
+
+
+# given an album name, return various full filenames about it,
+# depending on the first argument:
+#	*	dir			==	full name of album directory (where song files are stored)
+#	*	tracklist	==	full name of tracklist for album
+#	*	cover		==	full name of album cover JPG file
+function album
+{
+	type="$1"
+	album="$2"
+
+	echo "$(perl -MMusic -le 'print album(@ARGV)' "$type" "$album")"
+}
+
+# given a tracklist, return the full filename to it
+function tracklist
+{
+	tracklist="${typedirs[tracklist]}/$1"
+	echo "$tracklist"
+}
+
+# given a Dropbox file, return the full filename to it
+function dropbox_file
+{
+	db_file="${typedirs[Dropbox]}/$1"
+	echo "$db_file"
+}
+
+
+# iterate through tracks in a given tracklist
+# run the given command with $track set to the current track
+function foreach_track
+{
+	tracklist="$(tracklist "$1")"
+	command="$2"
+
+	for track in $(cat "$tracklist")
+	do
+		track="${track##$MUSICHOME/}"
+		eval $command
+	done
+}
+
+
+# given a title (album, artist, or song), consistencize it:
+#	*	fixup title case
+#	*	convert any Unicode to plain ASCII (not implemented yet)
+#	*	convert any slashes to tildes
+#	*	backslash any double quotes
+function fixup_title
+{
+	title="$1"
+
+	title="$(perl -Mmyperl -le 'my $t = shift; $t =~ s{/}{~}g; $t =~ s/"/\\"/; print title_case($t)' "$title")"
+	echo "$title"
+}

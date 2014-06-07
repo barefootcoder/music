@@ -1,0 +1,82 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+use File::Copy;
+use Cwd qw<getcwd>;
+use File::Basename;
+use File::Temp qw<tempdir>;
+
+
+my $m3u = $ARGV[0];
+-r $m3u or die("must supply filename to read tracks from");
+
+my $album_name = basename($m3u, '.m3u');
+my $zip = "$album_name.zip";
+$zip =~ s/ //g;
+if (-e $zip)
+{
+	print "going to overwrite existing $zip.  is that okay?  [y/N] ";
+	unless (<STDIN> =~ /^[yY]/i)
+	{
+		exit;
+	}
+	unlink($zip);
+}
+
+my $dir = tempdir(CLEANUP => 1);
+my $subdir = (fileparse($m3u, qr/\.\w+/))[0];
+my $tracklist = "$subdir.m3u";
+my $landing = get_landing_dir($subdir);
+$subdir = basename($landing);
+
+#print "Will create files in subdir: $subdir\n";
+#print "Is this okay?  [Y/n] ";
+#unless ( <STDIN> =~ /^\n|^[yY]/i)
+#{
+#	exit;
+#}
+
+mkdir "$dir/$subdir" or die("can't create subdir");
+#show_dir();
+open(OUT, ">$dir/$subdir/$tracklist") or die("can't create new tracklist");
+open(IN, $m3u) or die("can't read old tracklist");
+while( <IN> )
+{
+	chomp;
+	next if /^#/ or /^$/;
+	my $mp3 = basename($_);
+
+	my $new = "$dir/$subdir/$mp3";
+	#print "copying (supposedly) from $_ to $new\n";
+	copy($_, $new) or die("can't copy mp3 to $new");
+	#show_dir();
+
+	print OUT "$landing/$mp3\n";
+}
+close(IN);
+close(OUT);
+
+
+my $cwd = getcwd();
+chdir $dir;
+system('zip', '-r9', "$cwd/$zip", '.');
+
+
+sub get_landing_dir
+{
+	my $default = "J:\\music\\$_[0]";
+
+	print "directory where new album will land? [$default] ";
+	chomp(my $ldir = <STDIN>);
+	$ldir ||= $default;
+	return $ldir;
+}
+
+sub show_dir
+{
+	system("ls -lR $dir");
+	print "Press return to continue.  ";
+	<STDIN>;
+}

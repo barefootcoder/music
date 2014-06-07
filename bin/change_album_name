@@ -1,0 +1,27 @@
+#! /usr/bin/env perl
+
+use myperl;
+
+use File::Basename;
+
+use Music;
+
+
+my $album = album_arg($ARGV[0]);
+my $new_album = $ARGV[1];
+
+ALBUM:
+{
+	if ($new_album)
+	{
+		print "Transforming: $album ==> $new_album\n";
+		print "Is this right?  [y/N] ";
+		last ALBUM if <STDIN> =~ /^y/i;
+	}
+	print "Enter new album name: ";
+	$new_album = <STDIN>;
+	chomp $new_album;
+	redo ALBUM;
+}
+
+rename_album($album, $new_album);

@@ -1,0 +1,26 @@
+#! /usr/bin/env perl
+
+use myperl;
+use autodie qw< :all >;
+
+use File::Next;
+
+use Music;
+
+
+my $tracks = File::Next::files({ file_filter => sub { /@ARGV/i } }, track_dirs());
+say file($_)->absolute while $_ = $tracks->();
+
+
+my @mixes = grep { grep { /@ARGV/i } slurp } glob($TRACKLIST_DIR->file("[RPMm]*", "*.m3u"));
+if (@mixes)
+{
+	say '';
+	say "in mixes:";
+	foreach (@mixes)
+	{
+		say;
+		print "\t";
+		system(qw< grep -Pi >, "@ARGV", $_);
+	}
+}

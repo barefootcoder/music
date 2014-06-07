@@ -1,0 +1,28 @@
+#! /usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Debuggit(DEBUG => 1);
+
+use File::stat;
+use File::Basename;
+use List::Util qw< max >;
+
+use Music;
+
+
+# update "incoming" playlist
+my $incoming = "$ENV{MUSICHOME}/incoming";
+system("/bin/ls -1 $incoming/* >$ENV{MUSICHOME}/tracklists/misc/incoming.m3u") if -d $incoming;
+
+rebuild_playlists();
+
+## update Windoze versions of tracklists
+#foreach (split("\n", `find $ENV{MUSICHOME}/tracklists -name win -type d -prune -o -name '*.m3u' -print`))
+#{
+#	my $st = stat($_) or die("can't stat $_");
+#	my ($base, $dir) = fileparse($_);
+#	my $wst = stat("$dir/win/$base");
+#	system("$ENV{MUSICHOME}/bin/xlate_win '$_'") if max($st->mtime, $st->ctime) > ($wst ? $wst->mtime : 0);
+#}
