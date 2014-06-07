@@ -10,7 +10,7 @@ fi
 
 if ! echo $PERL5LIB | grep -q $MUSICHOME
 then
-	export PERL5LIB="$PERL5LIB:$MUSICHOME/bin"
+	export PERL5LIB="$PERL5LIB:$MUSICHOME/lib"
 fi
 
 cd $MUSICHOME

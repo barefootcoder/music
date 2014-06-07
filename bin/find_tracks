@@ -1,9 +1,5 @@
 #! /bin/bash
 
-#funcs=$MUSICHOME/bin/functions
-#[[ -r $funcs ]] || { echo "$0: can't load functions" >&2 && exit 1; }
-#. $funcs
-
 readonly me=${0##*/}                                                    # slightly prettier than $0
 
 verbose=0

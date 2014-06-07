@@ -48,24 +48,3 @@ foreach (@files)
 	say $opts->{b} ? $_ : "$1/$2  $_" if $day >= $day_of_final;
 }
 say '' unless $opts->{b};
-
-
-
-
-
-
-
-__END__
-# original bash script follows
-
-#! /bin/bash
-
-funcs=$MUSICHOME/bin/functions
-[[ -r $funcs ]] || { echo "$0: can't load functions" >&2 && exit 1; }
-NOARG=1 . $funcs
-
-dir=${typedirs[tracklist]}/Albums
-
-
-#echo $dir
-find $dir -type f -printf "%T@ %f\n" | sort -n | perl -lpe 's/^\d+\.\d+\s+//' | tail

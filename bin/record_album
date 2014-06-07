@@ -1,6 +1,6 @@
 #! /bin/bash -x
 
-funcs=$MUSICHOME/bin/functions
+funcs=$MUSICHOME/etc/functions
 [[ -r $funcs ]] || { echo "$0: can't load functions" >&2 && exit 1; }
 . $funcs
 

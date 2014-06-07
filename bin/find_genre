@@ -5,7 +5,7 @@ use autodie qw< :all >;
 
 use MP3::Tag;
 use Getopt::Std;
-use File::Glob ':bsd_glob';
+use File::Glob 'bsd_glob';
 
 use Music;
 

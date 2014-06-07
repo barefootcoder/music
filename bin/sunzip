@@ -19,46 +19,6 @@ unless ($album)
 }
 
 
-=begin old_way
-
-# fixup album name if necessary
-my $va = 0;
-my ($artist, $album_title) = title($album =~ /^(.*?) - (.*)$/);
-$album_title =~ s/(\s+-\s+[A-Z]\d+)?\s*---\s*Jamendo.*$//;
-if ($artist eq 'VA')
-{
-	if ( prompt -yd => 'n', "Multi-artist album?  " )
-	{
-		undef $artist;
-		$va = 1;
-	}
-}
-debuggit("artist", $artist, "album title", $album_title);
-
-my $inverted;
-if (defined $artist)
-{
-	if ( $artist =~ /^(\S+?) (\S+?)$/ and lc($1) ne 'the')
-	{
-		$inverted = "$2, $1";
-		unless ( prompt -yd => 'n', "Invert names like so? $inverted  " )
-		{
-			undef $inverted;
-		}
-	}
-	$album = $artist eq $album_title ? $inverted // $artist : ($inverted // $artist) . " - $album_title";
-	$album =~ s/^the //i;
-}
-else
-{
-	$album = $album_title;
-}
-debuggit( "creating album:", $album );
-
-=end old_way
-
-=cut
-
 # new way: just make a pointless albumname for the dir and let fixup_album take care of the hard stuff
 $album = "Xnew";
 
