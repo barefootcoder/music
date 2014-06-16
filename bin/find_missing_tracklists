@@ -1,0 +1,44 @@
+#! /usr/bin/env perl
+
+use myperl;
+use autodie qw< :all >;
+
+use Getopt::Std;
+use File::Glob 'bsd_glob';
+
+use Music;
+
+$| = 1;
+
+
+my $opts = {};
+getopts('hf', $opts);
+
+HELP_MESSAGE() if $opts->{h};
+
+sub HELP_MESSAGE
+{
+	say STDERR "usage: $ME [-h] | [-f]";
+	say STDERR "           -h : this help message";
+	say STDERR "           -f : fix (when a missing tracklist is found, regenerate it)";
+	exit;
+}
+
+
+say $opts->{f} ? "fixing" : "searching for", " missing tracklists ...";
+
+foreach (sort { lc $a cmp lc $b } grep { -d } $ALBUM_DIR->children)
+{
+	my $album = album_arg($_);
+	unless (-f album(tracklist => $album))
+	{
+		if ($opts->{f})
+		{
+			system('remake_tracklist', $_);
+		}
+		else
+		{
+			say $album;
+		}
+	}
+}
