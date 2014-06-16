@@ -13,7 +13,7 @@ while (my $file = $SINGLES_DIR->next)
 		my $track = $1;
 		if (my @tracks = `ls $ALBUM_DIR/*/"$track.mp3" 2>/dev/null`)
 		{
-			$found{$track} = [ map { file($_)->dir->basename } @tracks ];
+			$found{$track} = { map { chomp; file($_)->dir->basename => file($_) } @tracks };
 		}
 	}
 }
@@ -22,9 +22,13 @@ while (my $file = $SINGLES_DIR->next)
 if (%found)
 {
 	say "Found some duplicated tracks:\n";
-	foreach (sort keys %found)
+	foreach my $track (sort keys %found)
 	{
-		say;
-		say "  [also in] $_" foreach @{$found{$_}};
+		say $track;
+		foreach ( keys %{$found{$track}} )
+		{
+			say "  [also in] $_";
+			system("mp3diff", $found{$track}->{$_}, $SINGLES_DIR->file($track . '.mp3'));
+		}
 	}
 }
