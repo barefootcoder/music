@@ -86,7 +86,7 @@ foreach my $file (glob('*'))
 		$track_data->{'comment'} = '';
 	}
 
-#use Data::Printer; my $h = $tag->get_id3v2_frame_ids; p $h;
+#use Data::Printer; my $h = $tag->id3v2_frame_descriptors; p $h;
 	# remove useless frames:
 	#	*	TENC = encoded by (always useless)
 	#	*	TLAN = language (nearly always useless)

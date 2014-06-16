@@ -1,0 +1,55 @@
+#! /usr/bin/env perl
+
+use myperl;
+use autodie ':all';
+
+use MP3::Tag;
+
+
+my ($from, $to) = @ARGV;
+die("$0: must supply from and to on command line") unless $from and $to;
+
+my $old_tag = MP3::Tag->new($from);
+die("couldn't get tag: $!") unless $old_tag;
+$old_tag->get_tags;
+
+my $new_tag = MP3::Tag->new($to);
+$new_tag->config( write_v24 => 1 );
+{																		# remove existing tags
+	if ($new_tag->delete_tag("ID3v1"))
+	{
+		warn "\nExisting ID3v1 tag will be destroyed!!!\n";
+		exit 1 unless confirm "Are you sure?";
+	}
+	if ($new_tag->delete_tag("ID3v2"))
+	{
+		warn "\nExisting ID3v2 tag will be destroyed!!!\n";
+		warn "  Existing frames:\n";
+		warn "    $_\n" foreach $new_tag->id3v2_frame_descriptors;
+		exit 1 unless confirm "Are you sure?";
+	}
+	$new_tag->update_tags;
+}
+$new_tag = MP3::Tag->new($to);											# reread after deletion
+$new_tag->config( write_v24 => 1 );
+{																		# add ID3v1 tag
+	$new_tag->{ID3v1} = $old_tag->{ID3v1};
+}
+{																		# add ID3v2 tag
+	# delete whatever's in the new tag
+	# (should have been deleted above, but that doesn't seem to work)
+	$new_tag->select_id3v2_frame_by_descr($_, undef) foreach $new_tag->id3v2_frame_descriptors;
+	
+	# copy from the old tag
+	$new_tag->select_id3v2_frame_by_descr($_, $old_tag->select_id3v2_frame_by_descr($_))
+			foreach $old_tag->id3v2_frame_descriptors;
+}
+$new_tag->update_tags;
+
+# finally, rename file, if the user is cool with that
+if (confirm "Do you want to rename the new file with the old file's name?")
+{
+	my $base = file($from)->basename;
+	my $new = file($to)->dir->file($base);
+	rename $to, $new;
+}
