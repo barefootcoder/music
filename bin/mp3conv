@@ -1,0 +1,29 @@
+#! /bin/bash
+
+. ~/bin/bash_funcs
+
+grip=0
+while getopts ":Gh" opt
+do
+	case $opt in
+		G)	grip=1
+			;;
+		h)	echo "usage: $me -h | [-G] file [...]" >&2
+			echo "    -G : convert as Grip would do it" >&2
+			echo "    -h : this help message" >&2
+			exit
+			;;
+	esac
+done
+shift $(( $OPTIND - 1 ))
+
+for file in "$@"
+do
+	mp3="$(basename "$file" .wav).mp3"
+	if [[ $grip == 1 ]]
+	then
+		lame -h -b 128 "$file" "$mp3"
+	else
+		avconv -i "$file" -ab 192k -ar 44k "$mp3"
+	fi
+done
