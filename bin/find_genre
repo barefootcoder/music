@@ -32,13 +32,14 @@ my $genre = shift // genre_like($opts->{l});
 usage_error("must supply genre") unless $genre;
 say "searching for $genre ...";
 
-foreach (sort { lc $a cmp lc $b } $ALBUM_DIR->children)
+foreach my $album (sort { lc $a cmp lc $b } $ALBUM_DIR->children)
 {
-	next unless -d $_;
+	next unless -d $album;
 
-	my $sample_file = first { ! -d $_ } $_->children;
+	my $sample_file = first { /\.mp3$/ } grep { ! -d $_ } $album->children;
 	my $tag = MP3::Tag->new($sample_file);
-	say $_->basename if $tag->genre eq $genre;
+	warn("no tag for ", $album->basename) and next unless $tag;
+	say $album->basename if $tag->genre eq $genre;
 }
 
 
