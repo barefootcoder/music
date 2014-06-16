@@ -11,10 +11,23 @@ $MP3::Info::try_harder = 1;
 my $count = 0;
 my $cd_count = 0;
 my $total_secs = 0;
+my @title;
 while ( <> )
 {
-	print_totals(++$cd_count) if /^#\s*cut/;
-	next if /^#/;
+	if ( s/^#\s*// )
+	{
+		if ( /^cut\b/ )
+		{
+			print_totals(++$cd_count, join(' ', @title));
+			undef @title;
+		}
+		else
+		{
+			chomp;
+			push @title, $_;
+		}
+		next;
+	}
 
 	chomp;
 	my $info = get_mp3info($_) or die("can't open file: $_ ($@)");
@@ -22,18 +35,19 @@ while ( <> )
 	++$count;
 }
 ++$cd_count if $cd_count;
-print_totals($cd_count);
+print_totals($cd_count, join(' ', @title));
 
 
-func print_totals ($cd)
+func print_totals ($cd, $title)
 {
 	my $prefix = $cd ? Roman($cd) : '';
+	$title = "($title)" if $title;
 
 	my $mins = int( $total_secs / 60 );
 	my $secs = $total_secs % 60;
 	# have to use the sprintf hack here because lfill doesn't work ... possibly talk to Damian about
 	# this and patch it up
-	print form "{<<} Total: {>} tracks, {>}:{}", $prefix, $count, $mins, sprintf("%02d", $secs);
+	print form "{<<} Total: {>} tracks, {>}:{}    $title", $prefix, $count, $mins, sprintf("%02d", $secs);
 
 	$count = 0;
 	$total_secs = 0;
