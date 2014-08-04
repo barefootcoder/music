@@ -18,7 +18,7 @@ our @EXPORT = qw<
 	get_track_info
 	get_tag compare_song_times
 	attach_album_art extract_album_art
-	rebuild_playlists tracklist_file find_tracklists_containing cover_file realpath
+	rebuild_playlists tracklist_file find_tracklists_containing cover_file
 >;
 
 
@@ -111,18 +111,6 @@ func album ($type, $album)
 func track_dirs ()
 {
 	return ($ALBUM_DIR, $SINGLES_DIR);
-}
-
-
-# DEPRECATED! switch to Path::Class style instead
-sub realpath
-{
-	warn("this function is deprecated and will be removed in a future version");
-
-	# similar to Cwd::realpath, only works for files as well as dirs
-	my ($vol, $dir, $file) = File::Spec->splitpath(File::Spec->rel2abs($_[0]));
-	my $realpath = Cwd::realpath(File::Spec->catpath($vol, $dir));
-	return File::Spec->catfile($realpath, $file);
 }
 
 

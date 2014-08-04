@@ -1,12 +1,8 @@
-#! /usr/bin/perl
+#! /usr/bin/env perl
 
-use strict;
-use warnings;
+use myperl;
 
 use Getopt::Std;
-use File::Basename;
-
-use Debuggit;
 
 use Music;
 
@@ -17,19 +13,17 @@ my $opts = {};
 getopts('y:fFq', $opts);
 
 
-print "\n";
-fix_tags($_) foreach @ARGV;
+say '';
+fix_tags($_) foreach map { file($_) } @ARGV;
 
 
-sub fix_tags
+func fix_tags (Path::Class::File $mp3)
 {
-	my ($mp3) = @_;
 	print "file: $mp3", $opts->{q} ? "\t\t" : "\n";
 
 	-f $mp3 or die("must supply mp3 files as args\n");
-	my @fileparts = realpath($mp3);
-	my $suffix = pop @fileparts;
-	$suffix eq '.mp3' or die("file $mp3 is not a .mp3 file\n");
+	my @fileparts = $mp3->absolute->resolve->components;
+	$fileparts[-1] =~ s/\.mp3$// or die("file $mp3 is not a .mp3 file\n");
 
 	my $correct = {};
 	$correct->{title} = pop @fileparts;
@@ -61,11 +55,11 @@ sub fix_tags
 	{
 		if ($opts->{q})
 		{
-			print "Fixing.\n";
+			say "Fixing.";
 		}
 		else
 		{
-			print "Will transform:\n";
+			say "Will transform:";
 			print "\t$_ : $tag->{$_} => $new_tag->{$_}\n" foreach sort keys %$new_tag;
 		}
 		unless ($opts->{f})
@@ -83,14 +77,14 @@ sub fix_tags
 	{
 		if ($opts->{F})
 		{
-			print "Forcing.\n";
+			say "Forcing.";
 			set_tags($mp3, {}, { REMOVE_FIRST => 1 });
 		}
 		else
 		{
-			print "Nothing to transform.\n";
+			say "Nothing to transform.";
 		}
 	}
 
-	print "\n" unless $opts->{q};
+	say '' unless $opts->{q};
 }
