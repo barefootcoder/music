@@ -11,33 +11,51 @@ use File::HomeDir;
 use File::Basename;
 use Text::Capitalize;
 
+use Music::Dirs;
+use MusicCollection::Tag;
+
 use base 'Exporter';
-our @EXPORT = qw<
-	$ME $MUSICHOME $ALBUM_DIR $SINGLES_DIR $TRACKLIST_DIR $DROPBOX_DIR usage_error fatal_error album_arg
-	album title filename alpha_filename track_dirs sort_tracklist generate_tracklist rename_album
+our @EXPORT = (@Music::Dirs::EXPORT,									# pass these along
+qw<
+	$ME set_album_dir usage_error fatal_error album_arg
+	album title filename alpha_filename sort_tracklist generate_tracklist rename_album
 	get_track_info
-	get_tag compare_song_times
+	get_tag compare_song_times denumerify sort_string_fixup
 	attach_album_art extract_album_art
 	rebuild_playlists tracklist_file find_tracklists_containing cover_file
->;
+>);
 
 
 const our $ME => file($0)->basename;
-const our $MUSICHOME => dir($ENV{'MUSICHOME'});
-const our $ALBUM_DIR => $MUSICHOME->subdir('Albums');
-const our $SINGLES_DIR => $MUSICHOME->subdir('Singles');
-const our $TRACKLIST_DIR => $MUSICHOME->subdir('tracklists');
-const our $DROPBOX_DIR => dir(<~buddy>, 'Dropbox', 'music');
+
+# this can be changed to work with albums in places other than the default
+# use one of these:
+#		set_album_dir(to => $dir_containing_album_dirs);
+#		set_album_dir(from => $dir_containing_one_album);
+#		local $Music::AlbumDir = $dir_containing_album_dirs;
+our $AlbumDir = $ALBUM_DIR;
+
+func set_album_dir (:$from, :$to)
+{
+	if ($to)
+	{
+		$AlbumDir = dir($to);
+	}
+	elsif ($from)
+	{
+		$AlbumDir = dir($from)->parent;
+	}
+	else
+	{
+		my (undef, undef, undef, $me) = caller(0);
+		die("$me: must supply `from' or `to' as args");
+	}
+}
 
 
 func get_tag ($file)
 {
-	my $tag = MP3::Tag->new($file);
-	croak("couldn't get tag for $file [$!]") unless $tag;
-
-	$tag->get_tags;
-	$tag->config( write_v24 => 1 );
-	return $tag;
+	return MusicCollection::Tag->new( file => $file );
 }
 
 
@@ -94,7 +112,7 @@ func album ($type, $album)
 {
 	given ($type)
 	{
-		return $ALBUM_DIR->subdir($album)							when 'dir';
+		return $AlbumDir->subdir($album)							when 'dir';
 		return $TRACKLIST_DIR->file('Albums', "$album.m3u")			when 'tracklist';
 		when ('cover')
 		{
@@ -105,12 +123,6 @@ func album ($type, $album)
 
 		default { usage_error("illegal type $type to album()") }
 	}
-}
-
-
-func track_dirs ()
-{
-	return ($ALBUM_DIR, $SINGLES_DIR);
 }
 
 
@@ -162,8 +174,8 @@ func sort_tracklist (@tracks)
 	foreach (@tracks)
 	{
 		my $tag = get_tag($_);
-		my $tracknum = $tag->track1 || 0;
-		my $discnum = $tag->disk1 || 0;
+		my $tracknum = $tag->tracknum || 0;
+		my $discnum = $tag->discnum || 0;
 		my $year = $tag->year || 0;
 		$schwartzian{$_} = sprintf("%04d%s%02d%02d", $year, $tag->album, $discnum, $tracknum);
 	}
@@ -185,16 +197,15 @@ func generate_tracklist ($album)
 
 func rename_album ($old, $new)
 {
-	die("can't find existing album $old") unless -d $ALBUM_DIR->file($old);
-	die("new name $new already exists") if -e $ALBUM_DIR->file($new);
+	die("can't find existing album $old") unless -d $AlbumDir->file($old);
+	die("new name $new already exists") if -e $AlbumDir->file($new);
 
-	rename $ALBUM_DIR->file($old), $ALBUM_DIR->file($new);
+	rename $AlbumDir->file($old), $AlbumDir->file($new);
 
 	# fix tracklist
 	my $old_tl = album(tracklist => $old);
-	my $new_tl = album(tracklist => $new);
-	fix_tracklist($old_tl, $old, $new);
-	rename $old_tl, $new_tl;
+	unlink $old_tl if -e $old_tl;
+	generate_tracklist($new);
 
 	# fix cover file (if it exists)
 	my $old_cover = album(cover => $old);
@@ -208,9 +219,6 @@ func rename_album ($old, $new)
 	{
 		fix_tracklist($tl, $old, $new);
 	}
-
-	# always rebuild at the end
-	rebuild_playlists();
 }
 
 
@@ -250,6 +258,7 @@ func _generate_track_key ($new_track, $existing_tracks)
 	}
 	debuggit(4 => "after processing, struct is", DUMP => $existing_tracks);
 }
+
 
 func get_track_info ($url)
 {
@@ -314,22 +323,42 @@ func compare_song_times ($lhs, $rhs)
 }
 
 
+func denumerify ($text)
+{
+	use Lingua::EN::Numbers qw< num2en num2en_ordinal >;
+	use Lingua::EN::Numbers::Years;
+
+	$text =~ s/&/and/g;
+	$text =~ s/([12]\d{3})/ year2en($1) /eg;
+	$text =~ s/(\d+)(st|nd|rd|th)/ num2en_ordinal($1) /eg;
+	$text =~ s/(\d+)/ num2en($1) /eg;
+	return $text;
+}
+
+func sort_string_fixup ($text)
+{
+	# I don't think this order can be messed with much, if at all
+	return uc denumerify(filename($text)) =~ s/, The$//r =~ s/\W//gr;
+}
+
+
 func attach_album_art ($track, $image)
 {
-	my $tag = $track->isa('MP3::Tag') ? $track : get_tag($track);
-	die("no ID3v2 tag to attach album art to") unless $tag->{'ID3v2'};
-	$tag->{'ID3v2'}->add_frame('APIC', chr(0), 'image/jpeg', chr(3), 'Cover Art', $image);
-	$tag->update_tags({}, 1);
+	my $tag = $track->isa('MusicCollection::Tag') ? $track : get_tag($track);
+	die("no ID3v2 tag to attach album art to") unless $tag->has_v2;
+	$tag->set_frame(APIC => chr(0), 'image/jpeg', chr(3), 'Cover Art', $image);
+	$tag->save;
 }
 
 func extract_album_art ($track)
 {
-	my $tag = $track->isa('MP3::Tag') ? $track : get_tag($track);
+	my $tag = $track->isa('MusicCollection::Tag') ? $track : get_tag($track);
 	debuggit(4 => "tag is", DUMP => $tag);
 
-	return undef unless defined $tag->{'ID3v2'};
-	return undef unless defined $tag->{'ID3v2'}->get_frame('APIC');
-	return $tag->{'ID3v2'}->get_frame('APIC')->{'_Data'};
+	return undef unless $tag->has_v2;
+	my $frame = $tag->get_frame('APIC');
+	return undef unless defined $frame;
+	return ref $frame eq 'HASH' ? $frame->{'_Data'} : $frame;
 }
 
 
@@ -480,7 +509,7 @@ class MixTrack
 		use File::Glob 'bsd_glob';
 
 		#my $basename = "$artist - $title.mp3";
-		#my $filename = bsd_glob($ALBUM_DIR->subdir($self->artist . " - *")->file($basename))
+		#my $filename = bsd_glob($AlbumDir->subdir($self->artist . " - *")->file($basename))
 		#		|| bsd_glob($SINGLES_DIR->file($basename)) || die("can't locate track $basename");
 		#return $filename;
 	}
@@ -489,6 +518,8 @@ class MixTrack
 class Mixes
 {
 	use MooseX::Singleton;
+
+	use Music::Dirs;
 
 	has tracks	=>	( ro, isa => 'ArrayRef[MixTrack]', lazy_build );
 
