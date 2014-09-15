@@ -1,17 +1,20 @@
 #! /usr/bin/env perl
 
-use strict;
+use 5.14.2;
 use warnings;
+use autodie ':all';
 
-use Term::Menus;
-
-
-my $albumdir="$ENV{MUSICHOME}/Albums";
-# temporary until better work is done
-my $ls_opt = shift eq '-d' ? '-1tr' : '-1';
-system("/bin/ls $ls_opt $albumdir | less");
-exit;
+use Music;
 
 
-my $albums = [ glob("$albumdir/*") ];
-pick($albums, "Choose an album:");
+if (-t STDOUT)
+{
+	my $pager = $ENV{PAGER} // 'less';
+	open(PIPE, "| $pager");
+	foreach_album_tag { say PIPE $_->album_dir };
+	close(PIPE);
+}
+else
+{
+	foreach_album_tag { say $_->album_dir };
+}

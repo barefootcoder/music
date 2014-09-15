@@ -20,7 +20,7 @@ qw<
 	$ME set_album_dir usage_error fatal_error album_arg
 	album title filename alpha_filename sort_tracklist generate_tracklist rename_album
 	get_track_info
-	get_tag compare_song_times denumerify sort_string_fixup
+	get_tag foreach_album_tag compare_song_times denumerify sort_string_fixup
 	attach_album_art extract_album_art
 	rebuild_playlists tracklist_file find_tracklists_containing cover_file
 >);
@@ -56,6 +56,30 @@ func set_album_dir (:$from, :$to)
 func get_tag ($file)
 {
 	return MusicCollection::Tag->new( file => $file );
+}
+
+sub foreach_album_tag (&)
+{
+	my ($code) = shift;
+
+	# this is sort of like a Schwartzian transform
+	my %files;
+	foreach my $album (grep { -d } $AlbumDir->children)
+	{
+		my $sample_file = file( first { /\.mp3$/ } grep { ! -d } $album->children );
+		my $tag = get_tag($sample_file);
+		warn("no tag for ", $album->basename) and next unless $tag;
+
+		my $key = $tag->sortkey;
+		die("duplicate sortkey! [$key => $sample_file]") if exists $files{$key};
+		$files{$key} = $sample_file;
+	}
+
+	foreach (sort keys %files)
+	{
+		local $_ = get_tag($files{$_});
+		$code->();
+	}
 }
 
 
