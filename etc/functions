@@ -1,4 +1,7 @@
 # stuff that we want in many of our bash scripts
+set -e
+set -o pipefail
+shopt -s extglob
 
 readonly me=${0##*/}
 
@@ -76,7 +79,7 @@ then
 	do
 		dir="${typedirs[$type]}"
 		newarg="${ARG##$dir/}"
-		if [[ $newarg != $ARG ]]
+		if [[ "$newarg" != "$ARG" ]]
 		then
 			ARGTYPE=$type
 			ARG=$newarg
