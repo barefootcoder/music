@@ -54,7 +54,8 @@ typedirs[Dropbox]=$dbdir
 
 
 # normalize argument
-if [[ $NOARG != 1 ]]
+# but only if requested, by setting $ARGTYPE to something
+if [[ -n $ARGTYPE ]]
 then
 	ARGTYPE=
 	ARG="$1"
