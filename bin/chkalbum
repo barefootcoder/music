@@ -8,23 +8,7 @@ my $trackfile = file(shift);
 my $album = $trackfile->basename;
 $album =~ s/\.m3u$//;
 
-# stupid shell quoting ...
-my $arg = "$trackfile";
-$arg =~ s/'/'"'"'/g;
-
 say "$album:";
-open(IN, "file -f '$arg' |");
-while ( <IN> )
-{
-	next if /^#/;
-	my ($track, $file) = m{ ^ (.*?) \.mp3: \s* (.*) $}x or die("unknown line: $_");
-	($track = file($track)->basename) =~ s/^.*? - //;
-	given ($file)
-	{
-		$file = "Confused" when /^Audio file/ and not /MPEG/;
-		$file = "Good" when /^Audio file/;
-		$file = "MISSING!" when /^cannot open/;
-	}
-	printf("  %-50s   %s\n", $track, $file);
-}
-close(IN);
+my @files = grep { not /^#/ } slurp "$trackfile";
+chomp @files;
+system(qw< mp3time -Av >, @files);
