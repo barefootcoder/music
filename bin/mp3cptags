@@ -4,6 +4,25 @@ use myperl;
 use autodie ':all';
 
 use MP3::Tag;
+use Getopt::Std;
+
+use Music;
+
+
+my $opts = {};
+getopts('hf', $opts);
+
+HELP_MESSAGE() if $opts->{h};
+
+sub HELP_MESSAGE
+{
+	say STDERR "usage: $ME [-h] | [-f] <from-file> <to-file>";
+	say STDERR "           -f : force (don't ask silly questions)";
+	say STDERR "           -h : this help message";
+	say STDERR "          <from-file> : copy ID3 tags from here";
+	say STDERR "          <to-file>   : copy ID3 tags to here";
+	exit;
+}
 
 
 my ($from, $to) = @ARGV;
@@ -18,15 +37,21 @@ $new_tag->config( write_v24 => 1 );
 {																		# remove existing tags
 	if ($new_tag->delete_tag("ID3v1"))
 	{
-		warn "\nExisting ID3v1 tag will be destroyed!!!\n";
-		exit 1 unless confirm "Are you sure?";
+		unless ($opts->{f})
+		{
+			warn "\nExisting ID3v1 tag will be destroyed!!!\n";
+			exit 1 unless confirm "Are you sure?";
+		}
 	}
 	if ($new_tag->delete_tag("ID3v2"))
 	{
-		warn "\nExisting ID3v2 tag will be destroyed!!!\n";
-		warn "  Existing frames:\n";
-		warn "    $_\n" foreach $new_tag->id3v2_frame_descriptors;
-		exit 1 unless confirm "Are you sure?";
+		unless ($opts->{f})
+		{
+			warn "\nExisting ID3v2 tag will be destroyed!!!\n";
+			warn "  Existing frames:\n";
+			warn "    $_\n" foreach $new_tag->id3v2_frame_descriptors;
+			exit 1 unless confirm "Are you sure?";
+		}
 	}
 	$new_tag->update_tags;
 }
@@ -39,15 +64,15 @@ $new_tag->config( write_v24 => 1 );
 	# delete whatever's in the new tag
 	# (should have been deleted above, but that doesn't seem to work)
 	$new_tag->select_id3v2_frame_by_descr($_, undef) foreach $new_tag->id3v2_frame_descriptors;
-	
+
 	# copy from the old tag
-	$new_tag->select_id3v2_frame_by_descr($_, $old_tag->select_id3v2_frame_by_descr($_))
-			foreach $old_tag->id3v2_frame_descriptors;
+	# (the 'delete' here should be redundant, but can't hurt)
+	$old_tag->copy_id3v2_frames($new_tag, 'delete', 1);
 }
 $new_tag->update_tags;
 
 # finally, rename file, if the user is cool with that
-if (confirm "Do you want to rename the new file with the old file's name?")
+if ($opts->{f} or confirm "Do you want to rename the new file with the old file's name?")
 {
 	my $base = file($from)->basename;
 	my $new = file($to)->dir->file($base);
