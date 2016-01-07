@@ -203,23 +203,27 @@ func alpha_filename ($album, :$invert = 0)
 
 func sort_tracklist (@tracks)
 {
+	my $class = blessed $tracks[0] and $tracks[0]->isa('Path::Class::Entity');
 	my %schwartzian;
-	foreach (@tracks)
+	foreach (map { -d $_ ? dir($_)->children : file($_) } @tracks)
 	{
 		my $tag = get_tag($_);
 		my $tracknum = $tag->tracknum || 0;
 		my $discnum = $tag->discnum || 0;
 		my $year = $tag->year || 0;
-		$schwartzian{$_} = sprintf("%04d%s%02d%02d", $year, $tag->album, $discnum, $tracknum);
+		my $sortkey = $tag->has_sortkey ? $tag->sortkey : sprintf("%04d%s", $year, $tag->album);
+		$schwartzian{$_} = sprintf("%s%02d%02d", $sortkey, $discnum, $tracknum);
 	}
-	return sort { $schwartzian{$a} cmp $schwartzian{$b} } keys %schwartzian;
+	@tracks = sort { $schwartzian{$a} cmp $schwartzian{$b} } keys %schwartzian;
+	return $class ? map { file($_) } @tracks : map { "$_" } @tracks;
 }
 
 func generate_tracklist ($album)
 {
-	my $albumdir = album(dir => $album);
+	my $albumdir = -d $album ? dir($album)->absolute : album(dir => $album);
+	$album = $albumdir->basename if $album =~ m{/};
 
-	my @tracks = sort_tracklist grep { -f } $albumdir->children();
+	my @tracks = sort_tracklist grep { /\.mp3$/ } $albumdir->children();
 
 	my $tracklist_file = album(tracklist => $album);
 	open(OUT, ">$tracklist_file") or die("can't open tracklist file: $tracklist_file");
