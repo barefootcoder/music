@@ -37,7 +37,7 @@ foreach (@ARGV)
 		debuggit(2 => "pattern:", $pattern);
 
 		my $finder = File::Next::files( { file_filter => sub { /$pattern/ } },
-				"$ENV{MUSICHOME}/Albums", "$ENV{MUSICHOME}/Singles");
+				$ALBUM_DIR, $SINGLES_DIR, $MISC_DIR);
 		my @candidates;
 		push @candidates, $_ while $_ = $finder->();
 		if (@candidates == 0)

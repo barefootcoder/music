@@ -27,7 +27,7 @@ sub HELP_MESSAGE
 
 say $opts->{f} ? "fixing" : "searching for", " missing tracklists ...";
 
-foreach (sort { lc $a cmp lc $b } grep { -d } $ALBUM_DIR->children)
+foreach (sort { lc $a cmp lc $b } grep { -d } $ALBUM_DIR->children, $MISC_DIR->children)
 {
 	my $album = album_arg($_);
 	unless (-f album(tracklist => $album))

@@ -9,10 +9,9 @@ use Music;
 
 
 my $album = dir(shift);
-unless (-d $album and $album->dir_list(-2) eq 'Albums')
+unless ( -d $album and ($ALBUM_DIR->contains($album) or $MISC_DIR->contains($album)) )
 {
 	usage_error("I need an album directory to remake the tracklist of");
 }
-$album = $album->dir_list(-1);
 
 generate_tracklist($album);
