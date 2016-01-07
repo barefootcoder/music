@@ -173,13 +173,18 @@ func title (@titles)
 
 
 # turn a potential filename (or dirname) into a valid one by:
-#	*	changing any /'s into \'s
+#	*	changing any /'s into |'s
+#	*	remove any leading . (causes files to be "hidden" in Linux)
 #	*	turning any international characters into their Latin equivalents
+#	*	(and handling any cases where the above doesn't work that well)
 func filename ($title)
 {
 	use Text::Unidecode;
+	use charnames ':full';
 
 	$title =~ s{/}{|}g;
+	$title =~ s{^\.}{};
+	$title =~ s{(\d+)\N{DEGREE SIGN}}{$1 Degrees}g;						# turn 4° into "4 Degrees" instead of "4deg"
 	return unidecode($title);
 }
 
