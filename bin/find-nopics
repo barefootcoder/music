@@ -2,30 +2,57 @@
 
 use myperl;
 
-use MP3::Tag;
-use File::Basename;
-use Method::Signatures;
+use Getopt::Std;
 use File::Glob ':glob';
 
+use Music;
 
-say 'Singles:';
-our $INDENT = 2;
-foreach my $file (glob("$ENV{MUSICHOME}/Singles/*"))
+
+my $opts = {};
+getopts('hsS', $opts);
+
+HELP_MESSAGE() if $opts->{h};
+
+sub HELP_MESSAGE
 {
-	#say_if_no_pic($file);
+	say STDERR "usage: $ME [-h] | [-S] | [-s]";
+	say STDERR "           -h : this help message";
+	say STDERR "           -S : also check Singles/";
+	say STDERR "           -s : only summarize (ignores -S)";
+	exit;
+}
+
+our $INDENT;
+
+
+if ($opts->{S})
+{
+	say 'Singles:' unless $opts->{s};
+	$INDENT = 2;
+	foreach my $file (glob($SINGLES_DIR->file('*')))
+	{
+		say_if_no_pic($file);
+	}
 }
 
 
-say 'Albums:';
+say 'Albums:' unless $opts->{s};
 $INDENT = 4;
-foreach my $dir (glob("$ENV{MUSICHOME}/Albums/*"))
+my $count = 0;
+foreach my $dir (map { dir($_) } glob($ALBUM_DIR->file('*')), glob($MISC_DIR->file('*')))
 {
-	my $album = basename($dir);
-#say "checking $album ...";
+	my $album = $dir->basename;
+	print STDERR '.' if ++$count % 10 == 0 and $opts->{s};
 	foreach my $file (glob("$dir/*"))
 	{
 		say_if_no_pic($file, $album);
 	}
+}
+
+if ($opts->{s})
+{
+	say STDERR ' done';
+	say_if_no_pic('SUMMARY');
 }
 
 
@@ -33,15 +60,23 @@ func say_if_no_pic ($file, $album?)
 {
 	state $printed = {};
 
-	my $tag = MP3::Tag->new($file);
+	if ($file eq 'SUMMARY')
+	{
+		say foreach sort keys %$printed;
+		return;
+	}
+
+	return if $opts->{s} and not $album;								# no point; output would be suppressed anyway
+
+	my $tag = get_tag($file);
 	die("can't get tag for file $file") unless $tag;
-	unless ($tag->have_id3v2_frame_by_descr('APIC'))
+	unless ($tag->has_pic)
 	{
 		if ($album and !$printed->{$album})
 		{
-			say ' ' x ($INDENT/2), $album;
+			say ' ' x ($INDENT/2), $album unless $opts->{s};
 			$printed->{$album} = 1;
 		}
-		say ' ' x $INDENT, $tag->interpolate('%f');
+		say ' ' x $INDENT, $tag->file unless $opts->{s};
 	}
 }
