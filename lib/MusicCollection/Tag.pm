@@ -5,12 +5,15 @@ class MusicCollection::Tag
 {
 	use Carp;
 	use MP3::Tag;
+	use MP3::Info;
+	$MP3::Info::try_harder = 1;
 
 	use Music::Dirs;
 
 
 	# ATTRIBUTES
-	has file		=>	( ro, isa => 'Path::Class::File' );
+	has file		=>	( ro, isa => 'Path::Class::File', lazy, builder => '_get_sample_file' );
+	has dir			=>	( ro, isa => 'Path::Class::Dir', predicate => 'is_album' );
 	has _tag		=>	( rw, isa => 'MP3::Tag', lazy, builder => '_get_tag',
 								handles =>	{
 												tracknum => 'track1', discnum => 'disk1',
@@ -20,6 +23,11 @@ class MusicCollection::Tag
 													qw< comment_set >,
 											},
 						);
+	has _info		=>	( rw, isa => 'MP3::Info', lazy, builder => '_get_info',
+								handles =>	{
+												seconds => 'secs',
+											},
+						);
 	has status		=>	( rw, isa => Str, lazy, builder => '_guess_status', );
 
 
@@ -27,12 +35,32 @@ class MusicCollection::Tag
 
 	around BUILDARGS ($class: %args)
 	{
-		if ( $args{'file'} and not $args{'file'}->isa('Path::Class::File') )
+		if (exists $args{'file'})
 		{
-			$args{'file'} = file($args{'file'});
+			if ( not ( blessed $args{'file'} and $args{'file'}->isa('Path::Class::File') ) )
+			{
+				$args{'file'} = file($args{'file'});
+			}
+		}
+		elsif (exists $args{'dir'})
+		{
+			if ( not ( blessed $args{'dir'} and $args{'dir'}->isa('Path::Class::Dir') ) )
+			{
+				$args{'dir'} = dir($args{'dir'});
+			}
+		}
+		else
+		{
+			die("must supply either `file' or `dir' to create $CLASS");
 		}
 
 		$class->$orig(%args);
+	}
+
+
+	method _get_sample_file
+	{
+		return file( first { /\.mp3$/ } grep { ! -d } $self->dir->children );
 	}
 
 
@@ -44,6 +72,16 @@ class MusicCollection::Tag
 
 		$tag->get_tags;
 		return $tag;
+	}
+
+
+	method _get_info
+	{
+		croak("can't retrieve time for an album") if $self->is_album;
+		my $file = $self->file;
+		my $info = MP3::Info->new("$file");
+		croak("couldn't get info for $file [$!]") unless $info;
+		return $info;
 	}
 
 
@@ -85,12 +123,15 @@ class MusicCollection::Tag
 	}
 
 
-	# PSEUDO-ACCESSORS
+	# PSEUDO-ATTRIBUTES
 
 	method has_v1		{ exists $self->_tag->{ID3v1} }
 	method has_v2		{ exists $self->_tag->{ID3v2} }
 
 	method v1_data		{ $self->_tag->{ID3v1}->all }
+
+
+	method has_pic		{ $self->_tag->have_id3v2_frame_by_descr('APIC') }
 
 
 	method album_path	{ $self->_dirs_are_equal( $self->file->dir, $SINGLES_DIR ) ? undef : $self->file->dir }
@@ -103,7 +144,11 @@ class MusicCollection::Tag
 	}
 
 
+	method has_sortkey	{ defined $self->get_frame('TSO2') }
 	method sortkey		{ $self->get_frame('TSO2') // uc $self->album_dir }
+
+
+	method time			{ sprintf("%d:%02d", int($self->seconds / 60), $self->seconds % 60) }
 
 
 	# ACTION METHODS
@@ -126,7 +171,7 @@ class MusicCollection::Tag
 				my $keys = join(',', sort keys %$value);
 				if ($keys eq 'Text,_Data')
 				{
-					$name = "${name}[$value->{Text}]";
+					$name = "${name} {$value->{Text}}";
 					$value = $value->{_Data};
 				}
 				elsif ($keys =~ /Description,.*_Data/)
@@ -160,12 +205,14 @@ class MusicCollection::Tag
 	method set_frame ($frame, $newval)
 	{
 		$self->_tag->select_id3v2_frame_by_descr($frame, $newval);
+		return $self;													# for chaining
 	}
 
 
 	method rm_frame ($frame)
 	{
 		$self->set_frame($frame, undef);
+		return $self;													# for chaining
 	}
 
 }
