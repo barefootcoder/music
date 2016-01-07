@@ -20,7 +20,7 @@ qw<
 	$ME set_album_dir usage_error fatal_error album_arg
 	album title filename alpha_filename sort_tracklist generate_tracklist rename_album
 	get_track_info
-	get_tag foreach_album_tag compare_song_times denumerify sort_string_fixup
+	get_tag foreach_album_tag compare_song_times denumerify format_sortkey
 	attach_album_art extract_album_art
 	rebuild_playlists tracklist_file find_tracklists_containing cover_file
 >);
@@ -351,18 +351,23 @@ func denumerify ($text)
 {
 	use Lingua::EN::Numbers qw< num2en num2en_ordinal >;
 	use Lingua::EN::Numbers::Years;
+	use Time::ParseDate;
 
 	$text =~ s/&/and/g;
 	$text =~ s/([12]\d{3})/ year2en($1) /eg;
+	$text =~ s/'(\d{2})/ year2en(time2str("%Y", parsedate("01-01-$1"))) /eg;
 	$text =~ s/(\d+)(st|nd|rd|th)/ num2en_ordinal($1) /eg;
 	$text =~ s/(\d+)/ num2en($1) /eg;
 	return $text;
 }
 
-func sort_string_fixup ($text)
+func format_sortkey ($text)
 {
+	# handle any annoying special cases
+	return 'CHKCHKCHK' if $text eq '!!!';								# this is how they claim you should pronounce it
+
 	# I don't think this order can be messed with much, if at all
-	return uc denumerify(filename($text)) =~ s/, The$//r =~ s/\W//gr;
+	return uc denumerify(filename($text)) =~ s/, The$//r =~ s/^The //r =~ s/\W//gr;
 }
 
 
