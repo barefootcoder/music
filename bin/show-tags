@@ -1,0 +1,25 @@
+#! /usr/bin/env perl
+
+use 5.014;
+use utf8;
+use autodie qw< :all >;
+use warnings FATAL => 'all';
+
+use File::Basename;
+
+use Music;
+
+
+binmode(STDOUT, ':utf8');
+
+
+show($_) foreach @ARGV;
+
+
+sub show
+{
+	my ($file) = @_;
+
+	say basename($file);
+	get_tag($file)->print_frames('    ');
+}

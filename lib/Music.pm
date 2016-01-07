@@ -53,9 +53,9 @@ func set_album_dir (:$from, :$to)
 }
 
 
-func get_tag ($file)
+func get_tag ($file_or_dir)
 {
-	return MusicCollection::Tag->new( file => $file );
+	return MusicCollection::Tag->new( -d $file_or_dir ? (dir => $file_or_dir) : (file => $file_or_dir) );
 }
 
 sub foreach_album_tag (&)
@@ -66,13 +66,17 @@ sub foreach_album_tag (&)
 	my %files;
 	foreach my $album (grep { -d } $AlbumDir->children)
 	{
-		my $sample_file = file( first { /\.mp3$/ } grep { ! -d } $album->children );
-		my $tag = get_tag($sample_file);
+		my $tag = get_tag($album);
 		warn("no tag for ", $album->basename) and next unless $tag;
 
 		my $key = $tag->sortkey;
-		die("duplicate sortkey! [$key => $sample_file]") if exists $files{$key};
-		$files{$key} = $sample_file;
+		if (exists $files{$key})					# two albums with the same sortkey!
+		{											# just barf, after gathering enough info for an intelligent error
+			my $orig = $files{$key}->dir->relative($MUSICHOME);
+			my $new  = $album->relative($MUSICHOME);
+			die("duplicate sortkey! [$key => $orig & $new]")
+		}
+		$files{$key} = $tag->file;
 	}
 
 	foreach (sort keys %files)
