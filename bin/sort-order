@@ -1,0 +1,80 @@
+#! /usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use Music;
+
+
+my $song = file(shift);
+my $album = dir($song) if -d $song;
+unless ($album or ($song and -f $song and $song =~ /\.mp3$/))
+{
+	usage_error("I need an album directory or single MP3 file to fixup");
+}
+
+usage_error("no sortkey provided") unless @ARGV;
+my $sortkey = uc shift;
+my $mode;
+given ($sortkey)
+{
+	$mode = 'replace'					when /^[A-Z]+$/;
+	$mode = 'append'					when /^-\d$/;
+	$mode = 'title-reset'				when /^T:$/;
+	$mode = 'artist-reset'				when /^A:$/;
+	$mode = 'title-replace'				when /^T:.+$/;
+	$mode = 'force-va'					when /^:VA$/;
+	die("weird sortkey: $sortkey");		# otherwise
+}
+
+set_album_dir(from => $album) if $album;
+
+foreach ($album ? $album->children : $song)
+{
+	my $tag = get_tag($_);
+
+	my $album_so = $tag->get_frame('TSO2');
+	my $artist_so = $tag->get_frame('TSOP');
+	given ($mode)
+	{
+		when ('replace')
+		{
+			my $year = $tag->year;
+			my $appendix = $album_so =~ /(-\d)$/ ? $1 : '';
+			$tag->set_frame(TSOP => $sortkey);
+			$tag->set_frame(TSO2 => "$sortkey$year$appendix");
+		}
+
+		when ('append')
+		{
+			$tag->set_frame(TSO2 => "$album_so$sortkey");
+		}
+
+		when ('title-reset')
+		{
+			$tag->set_frame(TSOA => format_sortkey($tag->album =~ s/^The //r =~ s/^An? //r));
+			$tag->set_frame(TSO2 => $tag->get_frame('TSOA')) if $tag->genre =~ 'Soundtrack';
+		}
+
+		when ('artist-reset')
+		{
+			my $sortkey = $artist_so;
+			my $year = $tag->year;
+			$tag->set_frame(TSO2 => "$sortkey$year");
+		}
+
+		when ('title-replace')
+		{
+			$tag->set_frame(TSOA => $sortkey =~ s/^T://r);
+			$tag->set_frame(TSO2 => $tag->get_frame('TSOA')) if $tag->genre eq 'Soundtrack';
+		}
+
+		when ('force-va')
+		{
+			$tag->set_frame(TSO2 => $tag->get_frame('TSOA'));
+		}
+	}
+
+	printf("%-10s %-15s - %-50s\n", $tag->get_frame('TSOP'), $tag->get_frame($mode =~ /^title-/ ? 'TSOA' : 'TSO2'), $_);
+	$tag->save;
+}

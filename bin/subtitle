@@ -1,0 +1,53 @@
+#! /usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use Getopt::Std;
+
+use Music;
+
+
+my $opts = {};
+getopts('h', $opts);
+
+HELP_MESSAGE() if $opts->{h};
+
+sub HELP_MESSAGE
+{
+	say STDERR "usage: $ME [-h] | <album_dir>";
+	say STDERR "           -h : this help message";
+	exit;
+}
+
+
+my $album = dir(shift);
+die("I need an album dir to play with") unless -d $album;
+set_album_dir(from => $album);
+
+my $atitle;
+foreach ( $album->children )
+{
+	my $tag = get_tag($_);
+	$atitle = $tag->album;
+	foreach ( qr/:\s+(.*?)/, qr/\s+\((.*?)\)/ )
+	{
+		if ( $atitle =~ s/ $_ $//x )
+		{
+			$tag->set_frame(TSST => $1);
+			$tag->album_set($atitle);
+			$tag->save;
+			last;
+		}
+	}
+}
+
+my $oldname = $album->basename;
+my ($soundtrack_tag) = $oldname =~ /\[(.*?)\]$/;
+my $newname = $atitle;
+$newname .= " [$soundtrack_tag]" if $soundtrack_tag;
+rename_album($oldname, $newname);
+$album = $Music::AlbumDir->subdir($newname);
+system(qq{sort-order "$album" T:});
+
+say $album;

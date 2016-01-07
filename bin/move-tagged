@@ -1,0 +1,16 @@
+#! /bin/bash
+
+. ~/bin/bash_funcs
+
+dir="$1"
+album="$(basename "$dir")"
+tagdir="$(dirname "$dir")"
+newdir="$MUSICHOME/Albums/$album"
+
+[[ -d $dir ]] || die "arg must be a directory"
+[[ $tagdir -ef $MUSICHOME/for-tagging ]] || die "album dir must be in tagging dir"
+[[ ! -e $newdir ]] || die "destination dir $newdir already exists"
+
+mv "$dir" "$newdir"
+remake_tracklist "$newdir"
+chkalbum "$MUSICHOME/tracklists/Albums/$album.m3u"

@@ -1,0 +1,15 @@
+#! /bin/bash -e
+
+for dir in for-tagging/*
+do
+	album="$(basename "$dir")"
+	if [[ -d "Albums/$album" ]]
+	then
+		mv "Albums/$album" backup_Albums
+	else
+		echo "WARN!!! Cannot find corresponding album: $album"
+	fi
+	move-tagged "$dir"
+done
+
+find-errors

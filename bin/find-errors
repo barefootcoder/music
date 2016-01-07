@@ -1,0 +1,7 @@
+#!/bin/bash
+
+find-missing-tracks tracklists/*/*
+find-missing-tracklists
+echo -n "going to browse ... (press ENTER) "
+read
+browse

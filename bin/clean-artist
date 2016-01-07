@@ -1,0 +1,30 @@
+#! /bin/bash -e
+
+IFS="
+"
+if [[ $# -eq 0 ]]
+then
+	for artist in $(cat)
+	do
+		for album in $(find-tag-status -@lfm "Albums/$artist"*)
+		do
+			cp -pr "Albums/$album" for-tagging
+		done
+	done
+	exec 0</dev/tty
+else
+	for album in $(find-tag-status -@lfm "Albums/$1"*)
+	do
+		cp -pr "Albums/$album" for-tagging
+	done
+fi
+
+find-tag-status -@ for-tagging/*
+echo "Go tag these in Picard.  I'll wait."
+echo -n "Press ENTER to continue ... "
+read
+
+clean-all
+echo -n "Press ENTER if it all looks good ..."
+read
+move-all-tagged

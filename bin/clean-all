@@ -1,0 +1,10 @@
+#! /bin/bash -e
+
+IFS="
+"
+for dir in $(find-tag-status -Flfd)
+do
+	dir="for-tagging/$dir"
+	cp -pr "$dir" backup
+	clean-and-check "$dir"
+done

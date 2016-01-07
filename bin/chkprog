@@ -1,0 +1,23 @@
+#! /bin/bash
+
+# Throw out Albums/ in particular because it's handled separately.
+# Set $IFS to newline so we can handle dirs with spaces in them.
+IFS=$'\n'
+musicdirs=($(awk -F/ '$1 !~ /^#/ {print $4}' tracklists/*/*.m3u | sort -u | grep -v '^$' | grep -v '^Albums$'))
+
+echo "Dirs with music in them:"
+echo "========================"
+for dir in Albums "${musicdirs[@]}"
+do
+	echo " $dir/"
+done
+echo -e "\n"
+
+echo "Albums ripped:  $( find Albums/ -mindepth 1 -type d -newer ref | wc -l )"
+echo "Total space:     $( du -sch Albums/ "${musicdirs[@]}" tracklists/ | tail -n1 )"
+echo "Total Albums:  $( find Albums/ -mindepth 1 -type d | wc -l )"
+echo ''
+echo "Primary Drive:    $( du -sh Albums/ )"
+echo "Secondary Drive:  $( du -sch "${musicdirs[@]}" tracklists/ | tail -n1 )"
+musicdirs=($(perl -le 'print foreach @ARGV' "${musicdirs[@]}" | grep -v 'Hearts of Space'))
+echo "  (without HoS):  $( du -sch "${musicdirs[@]}" tracklists/ | tail -n1 )"

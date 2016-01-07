@@ -1,0 +1,57 @@
+#! /usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use Getopt::Std;
+
+use Music;
+
+
+my $opts = {};
+getopts('h', $opts);
+
+HELP_MESSAGE() if $opts->{h};
+
+sub HELP_MESSAGE
+{
+	say STDERR "usage: $ME [-h] | <album_dir>";
+	say STDERR "           -h : this help message";
+	exit;
+}
+
+
+const our $VOCALS_FRAME => 'TXXX[Vocals]';
+
+
+my $album = dir(shift);
+die("I need an album dir to play with") unless -d $album;
+set_album_dir(from => $album);
+
+foreach ( $album->children )
+{
+	my $tag = get_tag($_);
+	my $comment = $tag->comment;
+	my $vocals = $tag->get_frame($VOCALS_FRAME);
+	if ($vocals)
+	{
+		my $new_comment = "featuring $vocals";
+		if ($comment eq $new_comment)
+		{
+			# comment is already correct; just remove the vocals tag
+			$tag->rm_frame($VOCALS_FRAME);
+		}
+		elsif ($comment)
+		{
+			# comment exists but is not correct; bitch and move on
+			warn("vocals tag [$vocals] conflicts with comment [$comment]; ignoring");
+		}
+		else
+		{
+			# no comment, so safe to move the vocals tag there
+			$tag->comment_set($new_comment);
+			$tag->rm_frame($VOCALS_FRAME);
+		}
+		$tag->save;									# no harm done if we didn't actually update anything
+	}
+}

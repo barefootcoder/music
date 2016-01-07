@@ -6,6 +6,7 @@ use autodie qw< :all >;
 use MP3::Tag;
 use IO::Prompt;
 use File::Copy;
+use File::Copy::Recursive qw< dircopy >;
 
 use Music;
 
@@ -34,6 +35,7 @@ chdir $albumdir;
 
 # this should work because we have an absolute path at this point
 system( unzip => $zip );
+system( qw< chmod +w >, glob('*') );
 
 
 # handle coverfile, if any
@@ -47,7 +49,9 @@ if ($cover)
 }
 
 
-unlink $_ foreach glob('*.txt');
+unlink $_ foreach glob('*.txt'), glob('*.m3u');
+
+=for old-way
 
 # let fixup_album do all the hard work
 # (but don't run chkalbum; we'll do that ourselves at the end
@@ -61,11 +65,40 @@ say "Please use kID3 to tweak the files as necessary.";
 say "Press RETURN when ready to continue.";
 scalar <STDIN>;
 
-# remake the tracklist, JIC they changed something via kID3
-generate_tracklist($new_albumdir);
+=cut
+
+# another new way
+my $tagging_dir = $MUSICHOME->subdir('for-tagging', 'Xnew');
+#dircopy($albumdir, $tagging_dir);
+rename($albumdir, $tagging_dir);
+
+say "\nPlease use Picard to set the tags:";
+say "    for-tagging/Xnew/";
+say "Press RETURN when ready to continue.";
+scalar <STDIN>;
+
+# cleanup the Picard tags
+my $new_album = `clean-picard $tagging_dir | tail -n1`;
+chomp $new_album;
+
+# move from for-tagging/ to Albums/
+# (this runs chkalbum as well)
+system('move-tagged', $MUSICHOME->subdir('for-tagging', $new_album));
+
+# check that clean-picard did a good job
+system('check-picard', album(dir => $new_album));
+
+# queue this album up so it won't be forgotten
+my $queue = $TRACKLIST_DIR->file('misc', 'qqueue.m3u');
+if (-w $queue)
+{
+	my $fh = $queue->open('a');
+	print $fh album(tracklist => $new_album)->slurp;
+}
+else
+{
+	warn("Couldn't queue album!");
+}
 
 # get rid of the zip file
 unlink $zip;
-
-# finally, run chkalbum for visual confirmation
-system('chkalbum', album(tracklist => $new_albumdir));

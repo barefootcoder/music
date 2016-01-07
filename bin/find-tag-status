@@ -1,0 +1,82 @@
+#! /usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use Getopt::Std;
+
+use Music;
+
+
+const my %DEFAULT_MAP => ( 'find-tag-status' => 'du', 'find-picard' => 'cd', 'find-untagged' => 'u', );
+my $fmt_default = $DEFAULT_MAP{basename($0)};
+my $opts = {};
+getopts('AMSF@f:slh', $opts);
+$opts->{f} //= $opts->{'@'} ? 'cdmu' : $fmt_default;
+
+const my %TARGET_MAP => ( A => $ALBUM_DIR, M => $MISC_DIR, S => $SINGLES_DIR, F => $MUSICHOME->subdir('for-tagging'), );
+if ($opts->{'h'})
+{
+	say STDERR qq{usage: $0 [-f <fmt> | -s] [-A | -S | -F | -@ <dir> ...]};
+	say STDERR qq{          -f : Specify which statuses to report (default: $fmt_default)};
+	say STDERR qq{          -s : Summarize files (just count number of dirs or files in each category)};
+	say STDERR qq{          -l : List files only (don't also show the category)};
+	say STDERR qq{          -A : Search Albums directory (default)};
+	say STDERR qq{          -M : Search Misc directory};
+	say STDERR qq{          -S : Search Singles directory};
+	say STDERR qq{          -F : Search for-tagging directory};
+	say STDERR qq{          -@ : Identify <dir>};
+	say STDERR qq{       <fmt> : One letter for each status you want to see:};
+	say STDERR qq{                 c : "clean"    (tagged with Picard, then cleaned by script)};
+	say STDERR qq{                 d : "dirty"    (tagged with Picard but not yet cleaned)};
+	say STDERR qq{                 m : "manual"   (tagged manually)};
+	say STDERR qq{                 u : "untagged" (still needs to be tagged)};
+	exit;
+}
+my $target = $TARGET_MAP{ first { defined() } (grep { $opts->{$_} } keys %TARGET_MAP), 'A' };	# -A is the default
+debuggit(2 => "target is", $target);
+
+
+say '' if -t STDOUT;
+my %totals;
+foreach ($opts->{'@'} ? map { dir($_) } @ARGV : $target->children)
+{
+	my $tag = retrieve_tag($_);
+	next unless $tag;
+
+	unless ($opts->{'s'})
+	{
+		my $fmt_char = lc substr($tag->status, 0, 1);
+		$opts->{'l'} ? say $_->basename : printf(" %-6s   %s\n", $tag->status, $_->basename) if $opts->{'f'} =~ /$fmt_char/;
+	}
+
+	++$totals{lc $tag->status};
+}
+
+
+if ($opts->{'s'})
+{
+	printf "  %-8s :: %4d\n", $_, $totals{$_} foreach sort keys %totals;
+	say '';
+	printf "  %-8s :: %4d\n", 'TOTAL', sum values %totals;
+}
+
+
+say '' if -t STDOUT;
+
+
+func retrieve_tag ($target)
+{
+	const my $MP3_FILE => qr/\.mp3$/;
+
+	if (-d $target)
+	{
+		my $sample = first { /$MP3_FILE/ } $target->children;
+		die("empty directory! [$target]") unless $sample;
+		return get_tag($sample);
+	}
+	else
+	{
+		return $target =~ /$MP3_FILE/ ? get_tag($target) : undef;
+	}
+}

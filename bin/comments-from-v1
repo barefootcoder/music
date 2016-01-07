@@ -1,0 +1,37 @@
+#! /usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use Getopt::Std;
+
+use Music;
+
+
+my $opts = {};
+getopts('h', $opts);
+
+HELP_MESSAGE() if $opts->{h};
+
+sub HELP_MESSAGE
+{
+	say STDERR "usage: $ME [-h] | <album_dir>";
+	say STDERR "           -h : this help message";
+	exit;
+}
+
+
+my $album = dir(shift);
+die("I need an album dir to play with") unless -d $album;
+set_album_dir(from => $album);
+
+foreach ( $album->children )
+{
+	my $tag = get_tag($_);
+	my $comment = $tag->comment;
+	if ($comment)
+	{
+		$tag->comment_set($comment);				# this should update the v2 to match the v1, if it doesn't already
+		$tag->save;									# and should be no harm done if it already does
+	}
+}

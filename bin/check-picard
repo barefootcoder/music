@@ -1,0 +1,61 @@
+#! /bin/bash
+
+funcs=$MUSICHOME/etc/functions
+[[ -r $funcs ]] || { echo "$0: can't load functions" >&2 && exit 1; }
+. $funcs
+
+[[ -d $1 ]] || die "give me an album directory to check"
+
+first=0
+has_pic=0
+has_website=0
+multi_disc=0
+for file in "$1"/*
+do
+	has_comment=0
+	has_subtitle=0
+	tags="$(show-tags "$file" | fgrep -v "TXXX[Acoustid Id]" | fgrep -v "TXXX[ASIN]")"
+	if echo "$tags" | egrep -q 'COMM\((XXX|eng)\)'
+	then
+		has_comment=1
+	fi
+	if echo "$tags" | fgrep -q 'TSST'
+	then
+		has_subtitle=1
+	fi
+	if [[ $first == 0 ]]
+	then
+		first=1
+		pattern="APIC\(Cover \(front\)\)\[Cover Art]"
+		pattern="$pattern|TXXX\[MusicBrainz \w+ Id]"
+		pattern="$pattern|UFID\[http://musicbrainz\.org]"
+		echo "$tags" | tail -n+2 | grep -Pv "$pattern"
+		if echo "$tags" | grep -q APIC
+		then
+			has_pic=1
+		else
+			echo "!!! NO COVER ART !!!"
+		fi
+		if echo "$tags" | grep -q WOAR
+		then
+			has_website=1
+		fi
+		if echo "$tags" | grep -q TPOS
+		then
+			multi_disc=1
+			echo "!!! MULTI-DISC ALBUM !!!"
+		fi
+	else
+		if [[ $has_comment == 1 ]]
+		then
+			echo "$file"
+			echo "$tags" | egrep 'COMM\((XXX|eng)\)'
+		fi
+	fi
+	count=$(( $(echo "$tags" | wc -l) - 1 ))
+	expected=$(( 12 + $has_pic + $has_comment + $has_subtitle + $has_website + $multi_disc ))
+	if [[ $count != $expected ]]
+	then
+		echo "!!! wrong number of frames: $file $count/$expected"
+	fi
+done

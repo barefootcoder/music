@@ -1,0 +1,410 @@
+#! /usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use Getopt::Std;
+
+use Music;
+
+
+# frames we don't want to keep:
+my @BAD_FRAMES =
+(
+	TPE2							=>				# album artist; use this to determine VA albums and for -X, then toss it
+	TCOM							=>				# composer; not used much for popular music
+	TPE3							=>				# conductor; ditto
+	IPLS							=>				# instrument; very very rarely used
+	TEXT							=>				# lyricist; maybe if it was consistently there it would be useful
+	TOPE							=>				# original artist: if I'd ever seen one used properly, I might keep it
+	TLEN							=>				# track length; this is redundant data that can get out of sync
+	TFLT							=>				# file type; also redundant, also can get out of sync
+	TSOT							=>				# sort order for song title; use track order--why would we need this?
+	TDAT							=>				# release date; we use TYER (just the year)
+	TMED							=>				# media (CD, vinyl, digital, etc); well, it's digital now, ain't it?
+	TPUB							=>				# publisher (e.g. label); my dad would care ... but I don't
+	TCOP							=>				# copyright; legal mumbo-jumbo
+	WCOP							=>				# ditto, only moreso
+	TORY							=>				# original release date; we'll use it, but don't need to keep it
+	TLAN							=>				# language; almost always English anyway
+	TENC							=>				# encoded by ... who cares, really?
+	TSSE							=>				# encoder settings--I'm having difficulty caring less
+	TDEN							=>				# encoding timestamp; I lied: I really could care less
+	TSRC							=>				# ISRC (international standard recording code); useless today at least
+	TCMP							=>				# compilation; what is this good for?
+	MCDI							=>				# CD identifier (e.g. CDDB); not useful
+	GEOB							=>				# general encapsulated object; I've yet to see a useful one
+	TOFN							=>				# "original filename"; also nothing useful here thus far
+	WCOM							=>				# "commercial information": IOW, advertising <rolling eyes>
+	WOAF							=>				# "official audio file webpage" ... henh? (usually the same as WOAR)
+	WOAS							=>				# "official audio source webpage" (means yet another crappy website)
+	WPUB							=>				# "publisher's official webpage"; more crappy websites I don't need
+	'WXXX[]',										# user defined URL link frame; doesn't seem to be useful
+	'COMM(XXX)[CDDB Disc ID]',						# another place to put the CDDB ID, but I still don't want it
+	'COMM(sve)[]',									# Swedish comments? really?
+	'COMM(XXX)[ID3v1 Comment]',						# we'll stick with the ID3v2 comments, thank you very much
+	'COMM(eng)[ID3v1 Comment]',						# same thing, only in English (what was the last one in??)
+	'USER(eng)',									# appears to be some sort of legal mumbo jumbo
+	'TXXX[SCRIPT]',									# by the time I'm done with it, this is always "Latin"
+	'TXXX[CATALOGNUMBER]',							# like the label name (TPUB), just not something I need to know
+	'TXXX[Catalog #]',								# alternate name for the above, I believe
+	'TXXX[Style]',									# redundant with TCON (genre)
+	'TXXX[Disc Subtitle]',							# redundant with TSST
+	'TXXX[ENCODER]',								# redundant with TENC, which I already didn't care about
+	'TXXX[BARCODE]',								# really? what am I going to do with this?
+	'TXXX[DISCID]',									# not sure what this is, but it doesn't appear to be useful
+	'TXXX[major_brand]',							# has to do with the "file type box" (not useful to me)
+	'TXXX[minor_version]',							# ditto
+	'TXXX[compatible_brands]',						# ditto, I think
+	'TXXX[Ripping tool]',							# W(hy)TF do I care what it was ripped with?
+	'TXXX[Rip date]',								# or when it was ripped?
+	'TXXX[Supplier]',								# seems to be yet another way to say TENC or TXXX[ENCODER] ...
+	'TXXX[Source]',									# like whether it was ripped off CD, or vinyl, or whatever ... who cares
+	'TXXX[purchaseaccount]',						# this likely means whoever I bought it from stole it <sigh>
+	'TXXX[purchasedate]',							# but there's no point in keeping the evidence around
+	'TXXX[ALBUM ARTIST]',							# because TPE2 wasn't enough?
+	'TXXX[VA Artist]',								# because apparently even TXXX[ALBUM ARTIST] wasn't enough <sigh>
+	'TXXX[ENSEMBLE]',								# still ANOTHER way to say it???
+	'TXXX[ALBUMARTIST]',							# c'mon ... seriously?
+	'TXXX[PZTagEditor Info]',						# WTF??
+	'TXXX[MusicBrainz Album Type]',					# soundtrack, etc; we'll use it, but don't need to keep it
+	'TXXX[MusicBrainz Album Status]',				# official, bootleg, etc; not useful
+	'TXXX[MusicBrainz Album Artist Id]',			# we have the album ID and the artist ID ... what use is this?
+	'TXXX[MusicBrainz Release Group Id]',			# we have the release ID, so this is not that useful
+	'TXXX[MusicBrainz Album Release Country]',		# who cares?
+	'TXXX[Release type]',							# appears to be a duplicate of MusicBrainz Album Type
+	'TXXX[date]',									# oh look: it's a date.  whoopee.
+	'TXXX[comment]',								# this appears to be filled by YouTube converters
+	'TXXX[description]',							# this appears to be identical to the one above
+
+	# these are the same things as things above (or things we want to keep), only lower-casier and/or underscorier
+	'TXXX[musicbrainz_artistid]', 'TXXX[musicbrainz_albumid]', 'TXXX[musicbrainz_albumartistid]',
+	'TXXX[musicbrainz_trackid]', 'TXXX[albumartist]', 'TXXX[releasetype]', 'TXXX[releasestatus]', 'TXXX[tracktotal]',
+	'TXXX[artistsort]', 'TXXX[albumartistsort]', 'TXXX[language]', 'TXXX[script]', 'TXXX[asin]',
+);
+
+
+# catch "featuring" in all the various places it might be
+our $FEATURING_RE = qr/ \s+ (\()? feat(\.|uring) \s+ (.*) $/ix;
+
+
+my $opts = {};
+getopts('hX', $opts);
+
+HELP_MESSAGE() if $opts->{h};
+
+sub HELP_MESSAGE
+{
+	say STDERR "usage: $ME [-h] | [-X] <album_dir>";
+	say STDERR "           -h : this help message";
+	say STDERR "           -X : consider this album to be a remix album";
+	exit;
+}
+
+
+my ($target, $album, $mp3);
+if ( -d $ARGV[0] )
+{
+	$target = 'dir';
+	$album = dir(shift);
+}
+elsif (-f $ARGV[0] and $ARGV[0] =~ /\.mp3$/ )
+{
+	$target = 'file';
+	$mp3 = file(shift);
+}
+else
+{
+	usage_error("I need an album directory or a single MP3 file to fixup");
+}
+
+set_album_dir(from => $album) if $album;
+
+my ($album_name, @tracks, %song_titles);
+foreach ($target eq 'dir' ? sort_tracklist $album->children : $mp3)
+{
+	say $_;
+	my $tag = get_tag($_);
+
+	# we'll need the type ('artist', 'va', or 'soundtrack') to know how to construct the album name
+	# as well as the album sort order
+	my $type = figure_album_type($tag);
+	debuggit(2 => "album type =>", $type);
+
+	# comments about who created the file are pretty damn useless
+	# (and have to do this early, before handling "featuring" stuff)
+	if ($tag->comment =~ /^created by grip$/i or $tag->comment eq 'Magnatune.com')
+	{
+		$tag->comment_set(undef);
+	}
+
+	# slight tweaks to album and artist name
+	# (have to do this before calculating $album_name, below)
+	my $atitle = tweak_title($tag->album);
+	$tag->set_frame(TSST => $1) if $atitle =~ s/ - (.*)$//;				# handle any potential subtitle
+	$atitle =~ s/ EP$//;												# "EP" is a format, not part of the title
+	$tag->album_set($atitle);
+	my $artist = tweak_title($opts->{X} // $tag->artist);				# set this down below, in case of "featuring"
+
+	# song titles may need some slight tweaking
+	# and we need to figure out if there are multiple songs with the same title
+	# this also has to be done before calculating album name
+	my $title = $tag->title;
+	debuggit(4 => "initial title", $title);
+	if ( $title =~ s/$FEATURING_RE//									# handle "featuring" crap in titles
+			or $tag->get_frame('TSOT') =~ /$FEATURING_RE/				# might only be in the sort title, for some reason
+			or $artist =~ s/$FEATURING_RE//								# or might even be in the artist ... who knows?
+			or $tag->get_frame('TSOP') =~ /$FEATURING_RE/ )				# or in the artist sort key?  sheesh ...
+	{
+		my $comment = "featuring $3";
+		$comment =~ s/\)$// if $1;
+		add_comment($tag, $comment);
+	}
+	elsif ( my $featuring = $tag->get_frame('TXXX[Featuring]') )
+	{
+		my $comment = "featuring $featuring";
+		add_comment($tag, $comment);
+		$tag->rm_frame('TXXX[Featuring]');
+	}
+	if ( $opts->{X} )
+	{
+		my $comment = "remix of " . $tag->artist;
+		add_comment($tag, $comment);
+	}
+	$title = tweak_song_title($title);
+	debuggit(4 => "title after mixfix and tweakup", $title);
+	if (exists $song_titles{$title})
+	{
+		if ($song_titles{$title} == 1)
+		{
+			# now we know we have a duplicate
+			# so we must go back and adjust the original title
+			my $original = first { $_->title eq $title } map { $_->[0] } @tracks;
+			debuggit(2 => "resetting original track:", $original->title);
+			$original->title_set( "$title [1]" );
+		}
+		++$song_titles{$title};
+		$title = "$title [$song_titles{$title}]";
+	}
+	else
+	{
+		$song_titles{$title} = 1;
+	}
+	$tag->title_set( $title );
+	debuggit(3 => "set title to", $title);
+
+	# now that we've handled any potential "featuring" crap in the artist, set it
+	# should do this before figuring album name
+	$tag->artist_set($artist);
+	debuggit(3 => "set artist to", $artist);
+
+	# if we haven't set the album name, set it now
+	$album_name = figure_album_name($tag, $type) unless $album_name;
+	debuggit(2 => "album name =>", $album_name);
+
+	# year should really be original release date, assuming that exists
+	my $year = $tag->get_frame('TORY') // $tag->year;
+	$tag->set_frame(TYER => $year);
+
+	# remove frames which Picard adds which I neither need nor want
+	my @wm_frames =									# whatever private frames we have that reference "WM"
+		grep { my $f = $tag->get_frame($_); ref $f eq 'HASH' ? ($f->{'Text'} // '') =~ m{^WM/} : 0 }
+		grep { /^PRIV\d*/ }
+		$tag->frames;
+	my @itunes_frames =								# whatever comment or TXXX frames we have that reference "iTun"
+		grep { /^(COMM|TXXX).*\[iTun.*\]/ }
+		$tag->frames;
+	my @discogs_frames =							# whatever TXXX frames we have that reference "Discogs"
+		grep { /^TXXX\[Discogs_.*\]/ }
+		$tag->frames;
+	my @misc_sites_frames =							# various and sundry other crappy-ass websites
+		grep { my $f = $tag->get_frame($_); ref $f eq 'HASH' ? ($f->{'Text'} // '') =~ m{^http:} : 0 }
+		grep { /^PRIV\d*/ }
+		$tag->frames;
+	push @misc_sites_frames,
+		grep { my $f = $tag->get_frame($_); ref $f eq 'HASH' ? ($f->{'Text'} // '') =~ m{^mailto:} : 0 }
+		grep { /^UFID/ }
+		$tag->frames;
+	my @physical_values = qw< AverageLevel PeakValue >;
+	my @physical_frames =							# private frames that have more data that could be out-of-sync
+		grep { my $f = $tag->get_frame($_); ref $f eq 'HASH' ? ($f->{'Text'} // '') ~~ @physical_values : 0 }
+		grep { /^PRIV\d*/ }
+		$tag->frames;
+	$tag->rm_frame($_) foreach (
+			@BAD_FRAMES,
+			'APIC(Cover (front))[(1)]',				# a second front cover?
+			@wm_frames,
+			@itunes_frames,
+			@discogs_frames,
+			@misc_sites_frames,
+			@physical_frames,
+		);
+
+	# disc number requires a bit more thought:
+	# remove it if there's only 1 disc (i.e. if current discnum is "1/1")
+	# otherwise, just remove the total discs
+	my $frame = 'TPOS';
+	if (my $discnum = $tag->get_frame($frame))
+	{
+		if ($discnum eq '1/1')
+		{
+			$tag->rm_frame($frame);
+		}
+		else
+		{
+			$discnum =~ s{/\d+$}{};
+			$tag->set_frame($frame => $discnum);
+		}
+	}
+
+	# track number just gets the fixup
+	$frame = 'TRCK';
+	my $track = $tag->get_frame($frame);
+	$track =~ s{/\d+$}{};
+	$tag->set_frame($frame => $track);
+
+	if ($tag->get_frame('TSO2'))
+	{
+		# for artist and album sort (and album artist sort), make sure sortkeys are set properly
+		$tag->set_frame($_ => format_sortkey($tag->get_frame($_))) foreach qw< TSOA TSO2 >;
+		$tag->set_frame(TSOP => $type eq 'artist' ? $tag->get_frame('TSO2') : format_sortkey($tag->artist));
+
+		# artist+album sort should sort albums by the same artist chronologically
+		# so we'll just take the artist sort and tack on the year
+		# (for 'va' or 'soundtrack', reusing the title sort should be sufficient)
+		$tag->set_frame(TSO2 => $type eq 'artist'
+									? $tag->get_frame('TSO2') . $year
+									: $tag->get_frame('TSOA')
+						);
+	}
+
+	# add a descriptor to the cover art pic by transferring it to a different frame
+	# but only if the descriptor-less version exists, natch
+	my $old_pic_frame = 'APIC(Cover (front))';
+	my $new_pic_frame = 'APIC(Cover (front))[Cover Art]';
+	if (not $tag->get_frame($new_pic_frame))
+	{
+		my $cover = extract_album_art($tag);
+#		my $cover = $tag->get_frame($old_pic_frame);
+#		debuggit("found cover in expected place, length is", length($cover)) if $cover;
+#		if (not $cover)
+#		{
+#			# if we couldn't find the most common method that Picard uses to store covers, check to see
+#			# if it's stored in a more complicated tag with hash values
+#			$old_pic_frame = 'APIC';
+#			$cover = $tag->get_frame($old_pic_frame);
+#			if ($cover)
+#			{
+#				die("Can't figure out album cover format") unless ref $cover eq 'HASH' and $cover->{_Data};
+#				$cover = $cover->{_Data};
+#				debuggit("found cover through hash, length is", length($cover));
+#			}
+#		}
+		if ($cover)
+		{
+			# have to remove old one first, else when old is 'APIC', *all* 'APIC' frames get deleted
+			#$tag->rm_frame($old_pic_frame);
+			$tag->rm_frame('APIC');
+			$tag->set_frame($new_pic_frame => $cover);
+		}
+	}
+
+	push @tracks, [$tag, $_];
+}
+
+foreach (@tracks)
+{
+	my ($tag, $file) = @$_;
+
+	# save cleaned up up tags
+	$tag->save;
+
+	# now the renaming ...
+	my $trackname = $file->dir->file( $tag->filename );
+	rename $file, $trackname unless $file eq $trackname;
+}
+
+if ($target eq 'dir')
+{
+	# now we can rename the album dir and remake the tracklist
+	my $dirname = $album->dir_list(-1);
+	rename_album($dirname, $album_name) unless $dirname eq $album_name;
+	generate_tracklist($album_name);
+
+	say $album_name;
+}
+
+
+func figure_album_type ($tag)
+{
+	state $NOT_SOUNDTRACKS = [ 'Purple Rain', ];
+
+	my $atype = $tag->get_frame('TXXX[MusicBrainz Album Type]');
+	return 'soundtrack' if $atype and $atype =~ /soundtrack/i and not $tag->album ~~ $NOT_SOUNDTRACKS;
+
+	my $album_artist = $tag->get_frame('TPE2');
+	return 'N/A' if not $album_artist and $tag->album eq '[non-album tracks]';
+	die("cannot get album artist for " . $tag->filename) unless $album_artist;
+	$opts->{X} = $album_artist if $opts->{X};							# save this for later use
+	return 'va' if lc $album_artist eq 'various artists';
+
+	# must be regular single-artist album
+	return 'artist';
+}
+
+func figure_album_name ($tag, $type)
+{
+	my $name;
+	my $atitle = $tag->album;
+	if ($type eq 'artist')
+	{
+		# we'll use the artist sort order so we get properly inverted names and whatnot
+		my $artist_name = tweak_title(($tag->get_frame('TSO2') // $tag->get_frame('TSOP')) =~ s/$FEATURING_RE//r);
+		$artist_name =~ s/, (An?|The)$//;								# we don't need articles on the end (if any)
+		if ($tag->artist eq $atitle)
+		{
+			$name = $artist_name;
+		}
+		else
+		{
+			$name = join(" - ", $artist_name, $atitle);
+		}
+	}
+	else
+	{
+		$name = $atitle;
+		$name .= ' [Soundtrack]' if $type eq 'soundtrack';
+	}
+
+	return alpha_filename($name);
+}
+
+
+func tweak_title ($title)
+{
+	$title =~ s{[^:/]\K( $_ )}{lc $1}eg foreach map { ucfirst }
+			qw< a the in of on and but for with from into as than about >;
+	$title =~ s/ a minor/ A Minor/;										# special exception to the above
+	$title =~ s/(\S)(\.{3,})/$1 $2/g;									# space before ellipsis
+	$title =~ s/(\.{3,})(\w)/$1 $2/g;									# and space after ellipsis too
+	$title =~ s/ -- /--/g;												# OTOH, no spaces around dashes
+	return $title;
+}
+
+func tweak_song_title ($title)
+{
+	$title =~ s/\(([^)]*\b((re)?mix|version|dub|edit|vocal|demo)|live\b.*?|instrumental|reprise|unplugged)\)$/[$1]/i;
+	return tweak_title($title);
+}
+
+
+func add_comment ($tag, $new_comment)
+{
+	my $prev_comment = $tag->comment;
+	if ( $prev_comment =~ /^featuring/ and $new_comment =~ /^featuring/ )
+	{																# assume the new "featuring" is better than the old
+		warn("ditching old comment: $prev_comment");
+		undef $prev_comment;
+	}
+	$tag->comment_set($prev_comment ? join(' / ', $prev_comment, $new_comment) : $new_comment);
+}

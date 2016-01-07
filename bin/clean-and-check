@@ -1,0 +1,51 @@
+#! /bin/bash
+
+if [[ $1 == "-X" ]]
+then
+	OPT=$1
+	shift 1
+fi
+
+if [[ $1 == "reset" ]]
+then
+	RESET=1
+	shift 1
+fi
+. $MUSICHOME/etc/functions
+ARG="$1"
+
+if [[ $ARG == *_* ]]
+then
+	ARG="for-tagging/${ARG//_/ }"
+fi
+
+tagdir=for-tagging
+bakdir=backup
+[[ $ARG == $tagdir/* && -d $ARG ]] || die "must supply album in tagging area"
+
+backup="$bakdir/$(basename "$ARG")"
+while true
+do
+	if [[ $RESET ]]
+	then
+		[[ -d "$backup" ]] || die "won't reset w/o existing backup"
+		rm -rf "$ARG"
+		cp -r "$backup" $tagdir
+	else
+		diff -r "$ARG" "$backup" >/dev/null || die "won't clean w/o identical backup"
+		RESET=1										# if we have to come through again, we want to reset to the backup
+	fi
+
+	newalbum=$(clean-picard $OPT $ARG | tail -n1)
+	[[ -n $newalbum ]] || die "failure to get new album name"
+
+	dir=$tagdir/"$newalbum"
+	tracklist=$(album tracklist "$newalbum")
+
+	echo -e "\n"
+	chkalbum "$tracklist" | tail -n+2 | grep -v GOOD ||:
+	if verify-tagging "$dir"
+	then
+		break
+	fi
+done

@@ -1,11 +1,29 @@
-#! /usr/bin/perl
+#! /usr/bin/env perl
 
-use strict;
-use warnings;
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+use Carp::Always;
 
-use File::Basename;
+use Getopt::Std;
+use Path::Class;
 
-use constant DEBUG => 0;
+use Music;
+
+
+my $opts = {};
+getopts('hfF', $opts);
+$opts->{f} = 1 if $opts->{F};
+
+HELP_MESSAGE() if $opts->{h};
+
+sub HELP_MESSAGE
+{
+	say STDERR "usage: $ME [-h] | [-f|-F]";
+	say STDERR "           -h : this help message";
+	say STDERR "           -f : fix (when a missing track is found, try to find where it moved to)";
+	say STDERR "           -F : fix and shuffle the filenames (.m3u => .bak, .fix => .m3u)";
+	exit;
+}
 
 
 my @files_to_check;
@@ -24,23 +42,100 @@ foreach my $arg (@ARGV)
 		die("can't access $arg");
 	}
 }
-print STDERR "files to check: @files_to_check\n" if DEBUG;
+debuggit(3 => "files to check: @files_to_check");
 
 
 foreach my $file (@files_to_check)
 {
-	my $album = basename($file);
-	print STDERR "  checking : $album\n" if DEBUG;
+	# ignore .bak files
+	next if $file =~ /\.bak$/;
 
+	$file = file($file);
+	my $tracklist = $file->basename;
+	debuggit(2 => "  checking :", $tracklist);
+	my $fixed = [];
+
+	my $needs_fixfile = 0;
 	open(IN, $file) or die("can't open file $file");
 	while ( <IN> )
 	{
-		next if /^#/;
+		push @$fixed, $_ and next if /^#/;
 		chomp;
 
-		print STDERR "    checking : $_\n" if DEBUG >= 2;
-		print "$album :: MISSING: $_\n" unless -r $_;
-		
+		say STDERR "    checking : $_" if DEBUG >= 2;
+		if ( -r $_ )
+		{
+			push @$fixed, "$_\n";
+		}
+		else
+		{
+			if ($opts->{f})
+			{
+				$needs_fixfile = 1;
+				my $song = file($_)->basename;
+				debuggit(4 => "trying to find", $song);
+				my $repl = find_replacement($song);
+				push @$fixed, map { "$_\n" } $repl // ('# FOLLOWING TRACK IS MISSING:', $_);
+			}
+			else
+			{
+				say "$tracklist :: MISSING: $_";
+			}
+		}
+
 	}
 	close(IN);
+
+	if ($needs_fixfile)
+	{
+		my $fixfile = file($file =~ s/\.m3u$/.fix/r);
+		$fixfile->spew($fixed);
+		if ($opts->{F})
+		{
+			my $bakfile = $file =~ s/\.m3u$/.bak/r;
+			rename $file, $bakfile;
+			rename $fixfile, $file;
+			say "fixed $file; created $bakfile";
+		}
+		else
+		{
+			say "created fixfile: $fixfile";
+		}
+	}
+}
+
+
+func concistencize ($string)
+{
+	# We're going to have format_sortkey() do most of the hard work for us.  But we do need to
+	# extract any articles (A, An, or The) from the front of the string.  This isn't that hard, but
+	# we have to look out for any exceptions to the rule:
+	#	*	In "A House", the initial "A" isn't an article.  We'll have to explicitly exclude that
+	#		one.
+	#	*	For "The The", in a case where the first "The" has already been removed, we don't want
+	#		to remove the second one.  For this one, the fact that we search for the article _and_
+	#		the space after it should take care of it.
+	state $EXCEPTIONS = { map { $_ => 1 } ('A House') };
+
+	$string =~ s/^(The|A|An) // unless exists $EXCEPTIONS->{$string};
+	return format_sortkey($string);
+}
+
+func make_key ($song)
+{
+	my ($artist, $title) = $song =~ /^(.*?)(?: - (.*))?\.mp3$/;
+	return $title ? join('-', map { concistencize($_) } ($artist, $title)) : concistencize($artist);
+}
+
+func find_replacement ($song)
+{
+	state $ALL_SONGS =
+	{
+		map { make_key($_->basename) => $_ }
+		grep { /\.mp3$/ }
+		map { $_->children }
+		($SINGLES_DIR, $ALBUM_DIR->children, $MISC_DIR->children)
+	};
+
+	return $ALL_SONGS->{ make_key($song) };
 }

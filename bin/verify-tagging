@@ -1,0 +1,76 @@
+#! /usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use Getopt::Std;
+
+use myperl::Menu qw< mini_menu >;
+use Music;
+
+
+sub name_tweak;
+
+
+my $opts = {};
+getopts('h', $opts);
+
+HELP_MESSAGE() if $opts->{h};
+
+sub HELP_MESSAGE
+{
+	say STDERR "usage: $ME [-h] | <album_dir>";
+	say STDERR "           -h : this help message";
+	exit;
+}
+
+my @albums = map { dir($_) } @ARGV;
+undef @ARGV;															# so IO::Prompter doesn't do odd things
+
+
+our $album;
+foreach $album ( @albums )
+{
+	die("I need an album dir to play with [not $album]") unless -d $album;
+	set_album_dir(from => $album);
+
+	mini_menu("ratsvc \n\$" => "What shall we do with it? ",
+		premenu	=>	sub {
+							say '';
+							say $album->basename, ':';
+							say '';
+							system qq{ ls -C "$album" };
+							system qq{ check-picard "$album" };
+						},
+		help 		=>	{
+							r		=>	"reset and reclean",
+							a		=>	"reset artist sort order",
+							t		=>	"reset title sort order",
+							s		=>	"break title into title/subtitle",
+							v		=>	"fix vocals frames",
+							c		=>	"reset comments to v1 values",
+							"\n"	=>	"check again",
+							' '		=>	"move on",
+							'$'		=>	"go to a command prompt",
+						},
+		dispatch	=>	{
+							r		=>	sub { die			qq{ RE-PROCESS "$album"				};	 },
+							a		=>	sub { system		qq{ sort-order "$album" A:			}; 1 },
+							t		=>	sub { system		qq{ sort-order "$album" T:			}; 1 },
+							s		=>	sub { name_tweak	qq{ subtitle "$album"				}; 1 },
+							v		=>	sub { system		qq{ comments-from-vocals "$album"	}; 1 },
+							c		=>	sub { system		qq{ comments-from-v1 "$album"		}; 1 },
+							' '		=>	undef,
+							"\n"	=>	sub { 1 },
+							'$'		=>	sub { system("bash"); 1 },
+						},
+	);
+}
+
+
+func name_tweak ($command)
+{
+	my $new_name = `$command | tail -n1`;
+	chomp $new_name;
+	$album = dir($new_name);
+}
