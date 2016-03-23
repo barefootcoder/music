@@ -11,19 +11,24 @@ use Music;
 
 
 my $opts = {};
-getopts('hbn:x:', $opts);
+getopts('hbn:l:xB:', $opts);
+$opts->{n} //= $opts->{l};
 
 HELP_MESSAGE() if $opts->{h};
 
 sub HELP_MESSAGE
 {
-	say STDERR "usage: $ME [-h] | [-b] [-n num | -x num]";
+	say STDERR "usage: $ME [-h] | [-b] [-n num | -x num] [-B file]";
 	say STDERR "           -b : bare names only";
 	say STDERR "           -n : show at least num recent albums";
+	say STDERR "           -l : alias for -n";
 	say STDERR "           -x : show exactly num most recent albums";
+	say STDERR "           -B : show only albums before file's mod date";
 	say STDERR "           -h : this help message";
 	exit;
 }
+
+my $cutoff = $opts->{B} ? stat($opts->{B})->mtime : time;
 
 # yes, we really do mean || and not // here
 const our $NUM_ALBUMS => $opts->{x} || $opts->{n} || 10;
@@ -36,7 +41,7 @@ foreach ( $ALBUM_DIR->children )
 	my $day = time2str('%Y%m%d', $time);
 	$files{basename($_)} = { time => $time, day => $day };
 }
-my @files = sort { $files{$a}->{time} <=> $files{$b}->{time} } keys %files;
+my @files = sort { $files{$a}->{time} <=> $files{$b}->{time} } grep { $files{$_}->{time} < $cutoff } keys %files;
 
 my $day_of_final = $files{$files[-$NUM_ALBUMS]}->{day};
 @files = @files[-$NUM_ALBUMS..-1] if $opts->{x};
