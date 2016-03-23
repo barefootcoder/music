@@ -3,7 +3,11 @@ package Music::Dirs;
 use myperl;
 
 use base 'Exporter';
-our @EXPORT = qw< $MUSICHOME $ALBUM_DIR $MISC_DIR $SINGLES_DIR $XMAS_DIR $TRACKLIST_DIR $DROPBOX_DIR track_dirs >;
+our @EXPORT =
+(
+	qw< $MUSICHOME $ALBUM_DIR $MISC_DIR $SINGLES_DIR $XMAS_DIR $TRACKLIST_DIR $DROPBOX_DIR >,
+	qw< album_dirs track_dirs all_albums >
+);
 
 
 const our $MUSICHOME => dir($ENV{'MUSICHOME'});
@@ -15,9 +19,19 @@ const our $TRACKLIST_DIR => $MUSICHOME->subdir('tracklists');
 const our $DROPBOX_DIR => dir(<~buddy>, 'Dropbox', 'music');
 
 
+func album_dirs ()
+{
+	return ($ALBUM_DIR, $MISC_DIR);
+}
+
 func track_dirs ()
 {
-	return ($ALBUM_DIR, $SINGLES_DIR);
+	return (album_dirs, $SINGLES_DIR, $XMAS_DIR);
+}
+
+func all_albums ()
+{
+	return map { $_->children } album_dirs;
 }
 
 

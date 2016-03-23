@@ -11,7 +11,7 @@ use Music;
 
 
 my $opts = {};
-getopts('hbn:l:xB:', $opts);
+getopts('hbn:l:xB:v', $opts);
 $opts->{n} //= $opts->{l};
 
 HELP_MESSAGE() if $opts->{h};
@@ -24,6 +24,7 @@ sub HELP_MESSAGE
 	say STDERR "           -l : alias for -n";
 	say STDERR "           -x : show exactly num most recent albums";
 	say STDERR "           -B : show only albums before file's mod date";
+	say STDERR "           -v : be chatty";
 	say STDERR "           -h : this help message";
 	exit;
 }
@@ -35,21 +36,29 @@ const our $NUM_ALBUMS => $opts->{x} || $opts->{n} || 10;
 
 
 my %files;
-foreach ( $ALBUM_DIR->children )
+my $count = 0;
+print "Checking albums ..." if $opts->{v};
+foreach ( all_albums )
 {
+	++$count;
 	my $time = stat($_)->mtime;
 	my $day = time2str('%Y%m%d', $time);
 	$files{basename($_)} = { time => $time, day => $day };
 }
+say " done [$count albums checked]" if $opts->{v};
 my @files = sort { $files{$a}->{time} <=> $files{$b}->{time} } grep { $files{$_}->{time} < $cutoff } keys %files;
 
 my $day_of_final = $files{$files[-$NUM_ALBUMS]}->{day};
 @files = @files[-$NUM_ALBUMS..-1] if $opts->{x};
 say '' unless $opts->{b};
+$count = 0;
 foreach (@files)
 {
 	my $day = $files{$_}->{day};
 	$day =~ /^\d\d\d\d(\d\d)(\d\d)/;
-	say $opts->{b} ? $_ : "$1/$2  $_" if $day >= $day_of_final;
+	next unless $day >= $day_of_final;
+	++$count;
+	say $opts->{b} ? $_ : "$1/$2  $_";
 }
 say '' unless $opts->{b};
+say "Showed latest $count albums." if $opts->{v};
