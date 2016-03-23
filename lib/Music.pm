@@ -22,7 +22,7 @@ qw<
 	get_track_info
 	get_tag foreach_album_tag compare_song_times denumerify format_sortkey
 	attach_album_art extract_album_art
-	rebuild_playlists tracklist_file find_tracklists_containing cover_file
+	rebuild_playlists find_tracklists_containing cover_file
 >);
 
 
@@ -64,7 +64,7 @@ sub foreach_album_tag (&)
 
 	# this is sort of like a Schwartzian transform
 	my %files;
-	foreach my $album (grep { -d } $AlbumDir->children)
+	foreach my $album (grep { -d } all_albums)
 	{
 		my $tag = get_tag($album);
 		warn("no tag for ", $album->basename) and next unless $tag;
@@ -102,45 +102,56 @@ func usage_error ($msg)
 
 func album_arg ($arg)
 {
-	use Tie::IxHash;
-
-	tie my %typedirs, 'Tie::IxHash',
-	(
-		tracklist	=>	$TRACKLIST_DIR->absolute->resolve,
-		album		=>	$ALBUM_DIR->absolute->resolve,
-		base		=>	$MUSICHOME->absolute->resolve,
-		Dropbox		=>	$DROPBOX_DIR->absolute->resolve,
-	);
-
-
 	# normalize argument
 	my $argtype;
 	usage_error("must supply argument to operate on") unless $arg;
-	debuggit(2 => "album_arg argument is", $arg);
+	debuggit(3 => "album_arg argument is", $arg);
 
-	$arg = file($arg)->absolute->resolve;
+	$arg =~ s{/$}{};			# trailing slash really borks ->basename
+	$arg = file($arg);
 	usage_error("can't read the file: $arg") unless -r $arg;
 
-	foreach (keys %typedirs)
+	if (is_tracklist($arg))
 	{
-		my $dir = $typedirs{$_};
-		if ($typedirs{$_}->contains($arg))
-		{
-			my $album = $arg->basename;
-			$album =~ s/\.m3u$//;
-			return wantarray ? ($album, $_) : $album;
-		}
+		debuggit(4 => "album_arg argument is a tracklist");
+		my $album = $arg->basename =~ s/\.m3u$//r;
+		return wantarray ? ($album, 'tracklist') : $album;
+	}
+	elsif (is_album_dir($arg))
+	{
+		debuggit(4 => "album_arg argument is an album");
+		my $album = $arg->basename;
+		debuggit(3 => "album_arg album:", $album);
+		return wantarray ? ($album, 'album') : $album;
+	}
+	elsif ($MUSICHOME->resolve->contains($arg))
+	{
+		debuggit(4 => "album_arg argument is underneath MUSICHOME");
+		my $path = $arg->relative($MUSICHOME);
+		return wantarray ? ($path, 'base') : $path;
 	}
 
 	fatal_error("I have no idea what '$1' is");
 }
 
 
+func _find_albumdir ($album)
+{
+	# look for existing dir first
+	# $AlbumDir takes priority (even though it might be duplicated in album_dirs())
+	my $dir = first { -d } map { $_->subdir($album) } ($AlbumDir, album_dirs());
+	debuggit(3 => "_find_albumdir: existing", $album);
+	# looks like this will be a new album dir to be created
+	# always use $AlbumDir for that
+	$dir //= $AlbumDir->subdir($album);
+	return $dir;
+}
 func album ($type, $album)
 {
+	die("must have non-blank album name") unless $album;
 	given ($type)
 	{
-		return $AlbumDir->subdir($album)							when 'dir';
+		return _find_albumdir($album)								when 'dir';
 		return $TRACKLIST_DIR->file('Albums', "$album.m3u")			when 'tracklist';
 		when ('cover')
 		{
@@ -220,12 +231,15 @@ func sort_tracklist (@tracks)
 
 func generate_tracklist ($album)
 {
-	my $albumdir = -d $album ? dir($album)->absolute : album(dir => $album);
-	$album = $albumdir->basename if $album =~ m{/};
+	$album = album_arg($album) if -d $album;							# JIC it's a directory
+	my $albumdir = album(dir => $album);								# this will be the _proper_ directory
+	debuggit(3 => "generate_tracklist:", $albumdir);
 
 	my @tracks = sort_tracklist grep { /\.mp3$/ } $albumdir->children();
+	debuggit(3 => "|-->", scalar @tracks, "tracks");
 
 	my $tracklist_file = album(tracklist => $album);
+	debuggit(3 => "|-->", $tracklist_file);
 	open(OUT, ">$tracklist_file") or die("can't open tracklist file: $tracklist_file");
 	say OUT $_ foreach @tracks;
 	close(OUT);
@@ -234,10 +248,13 @@ func generate_tracklist ($album)
 
 func rename_album ($old, $new)
 {
-	die("can't find existing album $old") unless -d $AlbumDir->file($old);
-	die("new name $new already exists") if -e $AlbumDir->file($new);
+	my $old_dir = album(dir => $old);
+	my $new_dir = album(dir => $new);
+	die("can't find existing album $old") unless -d $old_dir;
+	die("new name $new already exists") if -e $new_dir;
 
-	rename $AlbumDir->file($old), $AlbumDir->file($new);
+	debuggit(2 => "rename_album:", $old_dir, "[", $old, "]", "=>", $new_dir, "[", $new, "]");
+	rename $old_dir, $new_dir;
 
 	# fix tracklist
 	my $old_tl = album(tracklist => $old);
@@ -441,24 +458,6 @@ sub rebuild_playlists
 	};
 
 	find($sub, $basedir);
-}
-
-
-# DEPRECATED! switch to album(tracklist => $album) style instead
-sub tracklist_file
-{
-	warn("this function is deprecated and will be removed in a future version");
-	my ($album_dir) = @_;
-
-	my ($vol, $dirs) = File::Spec->splitpath($album_dir, 1);
-	my @dirs = File::Spec->splitdir($dirs);
-
-	my $file = pop @dirs;
-	$file .= '.m3u';
-
-	splice @dirs, -1, 0, 'tracklists';
-	$dirs = File::Spec->catdir(@dirs);
-	return File::Spec->catpath($vol, $dirs, $file);
 }
 
 

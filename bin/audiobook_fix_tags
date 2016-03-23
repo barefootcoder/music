@@ -22,7 +22,7 @@ func fix_tags (Path::Class::File $mp3)
 	print "file: $mp3", $opts->{q} ? "\t\t" : "\n";
 
 	-f $mp3 or die("must supply mp3 files as args\n");
-	my @fileparts = $mp3->absolute->resolve->components;
+	my @fileparts = $mp3->resolve->components;
 	$fileparts[-1] =~ s/\.mp3$// or die("file $mp3 is not a .mp3 file\n");
 
 	my $correct = {};

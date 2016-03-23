@@ -9,7 +9,7 @@ use Music;
 
 
 my $album = dir(shift);
-unless ( -d $album and ($ALBUM_DIR->contains($album) or $MISC_DIR->contains($album)) )
+unless (is_album_dir($album))
 {
 	usage_error("I need an album directory to remake the tracklist of");
 }
