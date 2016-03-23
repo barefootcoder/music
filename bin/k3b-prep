@@ -1,0 +1,40 @@
+#!/usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use MP3::Tag;
+use IO::Prompt;
+use File::Copy;
+use File::Copy::Recursive qw< dircopy >;
+
+use Music;
+
+
+const our $DEST => $MUSICHOME->subdir('k3b', 'for-burning');
+
+
+my $playlist = shift;
+my $sequence = @ARGV ? shift : 1;
+die("need an M3U playlist") unless -r $playlist and $playlist =~ /\.m3u$/;
+die("second (optional) arg must be a positive int") unless $sequence =~ /^\d+$/ and $sequence > 0;
+
+my $counter = 1;
+my @tracks = grep { not /^#/ } grep { ++$counter if /^#\s*cut/; $counter == $sequence } slurp $playlist;
+chomp @tracks;
+
+my $tracknum = 0;
+foreach (@tracks)
+{
+	die("can't open track: $_") unless -r;
+	my $track = sprintf("%02d %s", ++$tracknum, file($_)->basename);
+	$track =~ s/[?]//g;													# some chars K3B can't handle
+	copy $_, $DEST->file($track);
+}
+
+say "Ready to burn.";
+say "Go into K3B and add files from $DEST.";
+say "Press <enter> when complete.";
+<STDIN>;
+
+$_->remove foreach $DEST->children;
