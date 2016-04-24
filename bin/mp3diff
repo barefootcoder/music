@@ -21,6 +21,11 @@ foreach (qw< bitrate frequency >)
 	print_diff($_ => $lhs->{$_}, $rhs->{$_}) unless $lhs->{$_} eq $rhs->{$_};
 }
 
+foreach (qw< rough-volume >)
+{
+	print_diff($_ => $lhs->{$_}, $rhs->{$_}) unless $lhs->{$_} == $rhs->{$_};
+}
+
 if (exists $lhs->{'tag1'} and exists $rhs->{'tag1'})
 {
 	foreach (sort keys %{$lhs->{'tag1'}})								# keys are guaranteed to be the same on both sides
@@ -56,16 +61,30 @@ elsif (exists $rhs->{'tag2'})
 }
 
 
+func get_sox_stats ($mp3)
+{
+	my $stats = {};
+	foreach (`sox "$mp3" -n stat 2>&1`)
+	{
+		/^ (.*?) : \h* (.*) \s*/x or die("unrecognized line from sox; $_");
+		$stats->{ $1 =~ s/\h{2,}/ /gr } = $2;
+	}
+	return $stats;
+}
+
 func gather_info ($mp3)
 {
 # line 62
 	my $data = {};
 	my $info = get_mp3info("$mp3");
 	my $tag = get_tag("$mp3");
+	my $sox_stat = get_sox_stats("$mp3");
 
 	$data->{'time'} = $info->{'TIME'} // '0:00';
 	$data->{'bitrate'} = ($info->{'BITRATE'} // '???') . 'kbps';
 	$data->{'frequency'} = ($info->{'FREQUENCY'} // '???') . 'kHz';
+
+	$data->{'rough-volume'} = 10 - $sox_stat->{'Volume adjustment'} * 2;
 
 	if (exists $tag->{ID3v1})
 	{
