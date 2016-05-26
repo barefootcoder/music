@@ -9,6 +9,9 @@ use MP3::Info;
 use Music;
 
 
+const our $VALUE_WIDTH => 40;
+
+
 my ($lh_file, $rh_file) = map { -d $_ ? dir($_) : file($_) } @ARGV;
 $rh_file = $rh_file->file($lh_file->basename) if -d $rh_file;
 my $lhs = gather_info($lh_file);
@@ -74,10 +77,9 @@ func get_sox_stats ($mp3)
 
 func gather_info ($mp3)
 {
-# line 62
 	my $data = {};
-	my $info = get_mp3info("$mp3");
 	my $tag = get_tag("$mp3");
+	my $info = $tag->_info;
 	my $sox_stat = get_sox_stats("$mp3");
 
 	$data->{'time'} = $info->{'TIME'} // '0:00';
@@ -86,17 +88,17 @@ func gather_info ($mp3)
 
 	$data->{'rough-volume'} = 10 - $sox_stat->{'Volume adjustment'} * 2;
 
-	if (exists $tag->{ID3v1})
+	if ($tag->has_v1)
 	{
-		@{ $data->{'tag1'} }{qw< title artist album year comment track genre >} = $tag->{ID3v1}->all;
+		@{ $data->{'tag1'} }{qw< title artist album year comment track genre >} = $tag->v1_data;
 	}
 
-	if (exists $tag->{ID3v2})
+	if ($tag->has_v2)
 	{
-		foreach my $frame ( $tag->id3v2_frame_descriptors )
+		foreach my $frame ( $tag->frames )
 		{
-			my $value = $tag->select_id3v2_frame_by_descr($frame);
-			$data->{'tag2'}->{$frame} = $value if defined $value;
+			my ($key, $value) = $tag->get_frame_for_display($frame, $VALUE_WIDTH);
+			$data->{'tag2'}->{$key} = $value;
 		}
 	}
 
@@ -107,8 +109,7 @@ func gather_info ($mp3)
 func print_diff ($label, $lhs, $rhs)
 {
 	state $started = 0;
-	state $width = 40;
-	state $format = "    %16s   %-${width}.${width}s     %-${width}.${width}s\n";
+	state $format = "%33s   %-${VALUE_WIDTH}.${VALUE_WIDTH}s     %-${VALUE_WIDTH}.${VALUE_WIDTH}s\n";
 
 	unless ($started)
 	{
@@ -116,8 +117,10 @@ func print_diff ($label, $lhs, $rhs)
 				? ($lh_file->dir =~ s{^$MUSICHOME/}{}r, $rh_file->dir =~ s{^$MUSICHOME/}{}r)
 				: ($lh_file->basename, $rh_file->basename);
 		printf $format, '', $l, $r;
-		printf $format, '', '-' x $width, '-' x $width;
+		printf $format, '', '-' x $VALUE_WIDTH, '-' x $VALUE_WIDTH;
 		$started = 1;
 	}
+	$lhs //= '<<MISSING>>';
+	$rhs //= '<<MISSING>>';
 	printf $format, $label . ':', $lhs, $rhs;
 }
