@@ -163,30 +163,7 @@ class MusicCollection::Tag
 
 	method print_frames ($prefix = '')
 	{
-		foreach my $name ($self->frames)
-		{
-			my $value = $self->get_frame($name);
-			if (ref $value eq 'HASH')
-			{
-				my $keys = join(',', sort keys %$value);
-				if ($keys eq 'Text,_Data')
-				{
-					$name = "${name} {$value->{Text}}";
-					$value = $value->{_Data};
-				}
-				elsif ($keys =~ /Description,.*_Data/)
-				{
-					$name = "${name} {$value->{Description}}+";
-					$value = $value->{_Data};
-				}
-				else
-				{
-					$value = "{$keys}";
-				}
-			}
-			printf "$prefix%-40s => %s\n", $name, !defined $value ? '<<NULL>>' :
-					$self->_is_binary($value) ? '<<BINARY>>' : substr($value, 0, 70);
-		}
+		printf "$prefix%-40s => %s\n", $self->get_frame_for_display($_) foreach $self->frames;
 	}
 
 
@@ -199,6 +176,42 @@ class MusicCollection::Tag
 	method get_frame ($frame)
 	{
 		return $self->_tag->select_id3v2_frame_by_descr($frame);
+	}
+
+	method get_frame_for_display ($frame, $width = 70)
+	{
+		my $value = $self->get_frame($frame);
+		if ( not defined $value )
+		{
+			$value = '<<NULL>>';
+		}
+		elsif (ref $value eq 'HASH')
+		{
+			my $keys = join(',', sort keys %$value);
+			if ($keys eq 'Text,_Data')
+			{
+				$frame = "${frame} {$value->{Text}}";
+				$value = $value->{_Data};
+			}
+			elsif ($keys =~ /Description,.*_Data/)
+			{
+				$frame = "${frame} {$value->{Description}}+";
+				$value = $value->{_Data};
+			}
+			else
+			{
+				$value = "{$keys}";
+			}
+		}
+		elsif ( $self->_is_binary($value) )
+		{
+			$value = '<<BINARY>>';
+		}
+		elsif ( length($value) > $width)
+		{
+			$value = substr($value, 0, $width - 1) . '…';
+		}
+		return ($frame, $value);
 	}
 
 
