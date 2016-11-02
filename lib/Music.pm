@@ -20,7 +20,7 @@ qw<
 	$ME set_album_dir usage_error fatal_error album_arg
 	album title filename alpha_filename sort_tracklist generate_tracklist rename_album
 	get_track_info
-	get_tag foreach_album_tag compare_song_times denumerify format_sortkey
+	get_tag foreach_album_tag compare_song_times seconds denumerify format_sortkey
 	attach_album_art extract_album_art
 	rebuild_playlists find_tracklists_containing cover_file
 >);
