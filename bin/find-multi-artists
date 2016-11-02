@@ -1,0 +1,80 @@
+#! /usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use Getopt::Std;
+use File::Basename;
+use File::Stat qw< stat >;
+
+use Music;
+
+
+my $opts = {};
+getopts('hCln:', $opts);
+$opts->{n} //= 2;
+
+HELP_MESSAGE() if $opts->{h};
+
+sub HELP_MESSAGE
+{
+	say STDERR "usage: $ME [-h] | [-C] [-n <num>]";
+	say STDERR "           -C : show only artists with at least 1 album whose tag status is not `clean'";
+	say STDERR "           -n : show only artists with at least <num> albums (default: 2)";
+	say STDERR "           -l : only list artist names (default: show stats)";
+	say STDERR "           -h : this help message";
+	exit;
+}
+
+
+my %artists;
+my %nodash_albums;
+my %notclean_albums;
+foreach ( $ALBUM_DIR->children )
+{
+	if ( $_->basename =~ m{^(.*?) - } )
+	{
+		add_album($1, $_);
+	}
+	elsif ( $_->basename !~ /\[.*Soundtrack\]/ )
+	{
+		$nodash_albums{$_->basename} = $_;
+	}
+}
+
+# now go back and pick up any self-titled albums
+foreach (keys %artists)
+{
+	if (exists $nodash_albums{$_})
+	{
+		add_album($_, $nodash_albums{$_});
+	}
+}
+
+say '' if -t STDOUT;
+say foreach
+	map { $opts->{l}
+			? $_
+			: $opts->{C}
+				? sprintf(" %2d : %-60s    [%2d not clean]", $artists{$_}, $_, $notclean_albums{$_})
+				: sprintf(" %2d : %s", $artists{$_}, $_)
+		}
+	sort { $artists{$b} <=> $artists{$a} || lc $a cmp lc $b }
+	grep { $opts->{C} ? $notclean_albums{$_} : 1 }
+	grep { $artists{$_} >= $opts->{n} }
+	keys %artists
+;
+say '' if -t STDOUT;
+
+
+sub add_album
+{
+	my ($artist, $album) = @_;
+
+	++$artists{$artist};
+	if ($opts->{C})
+	{
+		my $tag = get_tag($album);
+		++$notclean_albums{$artist} unless $tag->status eq 'clean';
+	}
+}
