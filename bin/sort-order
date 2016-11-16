@@ -19,7 +19,7 @@ my $mode;
 given ($sortkey)
 {
 	$mode = 'replace'					when /^[A-Z]+$/;
-	$mode = 'append'					when /^-\d$/;
+	$mode = 'append'					when /^-\d+$/;
 	$mode = 'title-reset'				when /^T:$/;
 	$mode = 'artist-reset'				when /^A:$/;
 	$mode = 'title-replace'				when /^T:.+$/;
