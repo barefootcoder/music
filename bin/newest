@@ -49,16 +49,18 @@ say " done [$count albums checked]" if $opts->{v};
 my @files = sort { $files{$a}->{time} <=> $files{$b}->{time} } grep { $files{$_}->{time} < $cutoff } keys %files;
 
 my $day_of_final = $files{$files[-$NUM_ALBUMS]}->{day};
+my $show_year = $day_of_final < time2str("%Y0101", time);
 @files = @files[-$NUM_ALBUMS..-1] if $opts->{x};
 say '' unless $opts->{b};
 $count = 0;
 foreach (@files)
 {
 	my $day = $files{$_}->{day};
-	$day =~ /^\d\d\d\d(\d\d)(\d\d)/;
+	$day =~ /^\d\d(\d\d)(\d\d)(\d\d)/;
 	next unless $day >= $day_of_final;
+	$day = $show_year ? "$2/$3/$1" : "$2/$3";
 	++$count;
-	say $opts->{b} ? $_ : "$1/$2  $_";
+	say $opts->{b} ? $_ : "$day  $_";
 }
 say '' unless $opts->{b};
 say "Showed latest $count albums." if $opts->{v};
