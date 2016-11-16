@@ -53,6 +53,8 @@ my @BAD_FRAMES =
 	'TXXX[ENCODER]',								# redundant with TENC, which I already didn't care about
 	'TXXX[BARCODE]',								# really? what am I going to do with this?
 	'TXXX[DISCID]',									# not sure what this is, but it doesn't appear to be useful
+	'TXXX[replaygain_track_peak]',					# something to do with encoding, maybe?
+	'TXXX[replaygain_track_gain]',					# goes with the above
 	'TXXX[major_brand]',							# has to do with the "file type box" (not useful to me)
 	'TXXX[minor_version]',							# ditto
 	'TXXX[compatible_brands]',						# ditto, I think
@@ -152,9 +154,9 @@ foreach ($target eq 'dir' ? sort_tracklist $album->children : $mp3)
 	my $title = $tag->title;
 	debuggit(4 => "initial title", $title);
 	if ( $title =~ s/$FEATURING_RE//									# handle "featuring" crap in titles
-			or $tag->get_frame('TSOT') =~ /$FEATURING_RE/				# might only be in the sort title, for some reason
+			or ($tag->get_frame('TSOT') // '') =~ /$FEATURING_RE/		# might only be in the sort title, for some reason
 			or $artist =~ s/$FEATURING_RE//								# or might even be in the artist ... who knows?
-			or $tag->get_frame('TSOP') =~ /$FEATURING_RE/ )				# or in the artist sort key?  sheesh ...
+			or ($tag->get_frame('TSOP') // '') =~ /$FEATURING_RE/ )		# or in the artist sort key?  sheesh ...
 	{
 		my $comment = "featuring $3";
 		$comment =~ s/\)$// if $1;
@@ -317,6 +319,7 @@ foreach (@tracks)
 	my ($tag, $file) = @$_;
 
 	# save cleaned up up tags
+	debuggit(4 => "saving tag");
 	$tag->save;
 
 	# now the renaming ...
@@ -328,8 +331,11 @@ if ($target eq 'dir')
 {
 	# now we can rename the album dir and remake the tracklist
 	my $dirname = $album->dir_list(-1);
+	debuggit(2 => "renaming album", $dirname, "=>", $album_name);
 	rename_album($dirname, $album_name) unless $dirname eq $album_name;
+	debuggit(5 => "renamed album");
 	generate_tracklist($album_name);
+	debuggit(5 => "generated tracklist");
 
 	say $album_name;
 }
@@ -342,7 +348,7 @@ func figure_album_type ($tag)
 	my $atype = $tag->get_frame('TXXX[MusicBrainz Album Type]');
 	return 'soundtrack' if $atype and $atype =~ /soundtrack/i and not $tag->album ~~ $NOT_SOUNDTRACKS;
 
-	my $album_artist = $tag->get_frame('TPE2');
+	my $album_artist = $tag->get_frame('TPE2') // $tag->get_frame('TPE1');
 	return 'N/A' if not $album_artist and $tag->album eq '[non-album tracks]';
 	die("cannot get album artist for " . $tag->filename) unless $album_artist;
 	$opts->{X} = $album_artist if $opts->{X};							# save this for later use
