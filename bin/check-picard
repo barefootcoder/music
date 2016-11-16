@@ -28,7 +28,7 @@ do
 		first=1
 		pattern="APIC\(Cover \(front\)\)\[Cover Art]"
 		pattern="$pattern|TXXX\[MusicBrainz \w+ Id]"
-		pattern="$pattern|UFID\[http://musicbrainz\.org]"
+		pattern="$pattern|UFID(\[| \{)http://musicbrainz\.org[}\]]"
 		echo "$tags" | tail -n+2 | grep -Pv "$pattern"
 		if echo "$tags" | grep -q APIC
 		then
