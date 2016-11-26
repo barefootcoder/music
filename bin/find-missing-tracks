@@ -1,6 +1,7 @@
 #! /usr/bin/env perl
 
-use myperl DEBUG => 1;
+use myperl::Script DEBUG => 1;
+use Method::Signatures;
 use autodie qw< :all >;
 use Carp::Always;
 
@@ -10,20 +11,12 @@ use Path::Class;
 use Music;
 
 
-my $opts = {};
-getopts('hfF', $opts);
-$opts->{f} = 1 if $opts->{F};
-
-HELP_MESSAGE() if $opts->{h};
-
-sub HELP_MESSAGE
-{
-	say STDERR "usage: $ME [-h] | [-f|-F]";
-	say STDERR "           -h : this help message";
-	say STDERR "           -f : fix (when a missing track is found, try to find where it moved to)";
-	say STDERR "           -F : fix and shuffle the filenames (.m3u => .bak, .fix => .m3u)";
-	exit;
-}
+opts <<"-";
+	[-f|-F]
+	-f : fix (when a missing track is found, try to find where it moved to)
+	-F : fix and shuffle the filenames (.m3u => .bak, .fix => .m3u)
+-
+$OPT{f} = 1 if $OPT{F};
 
 
 my @files_to_check;
@@ -69,7 +62,7 @@ foreach my $file (@files_to_check)
 		}
 		else
 		{
-			if ($opts->{f})
+			if ($OPT{f})
 			{
 				$needs_fixfile = 1;
 				my $song = file($_)->basename;
@@ -90,7 +83,7 @@ foreach my $file (@files_to_check)
 	{
 		my $fixfile = file($file =~ s/\.m3u$/.fix/r);
 		$fixfile->spew($fixed);
-		if ($opts->{F})
+		if ($OPT{F})
 		{
 			my $bakfile = $file =~ s/\.m3u$/.bak/r;
 			rename $file, $bakfile;

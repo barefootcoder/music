@@ -1,9 +1,24 @@
 #! /usr/bin/env perl
 
-use myperl DEBUG => 1;
+use myperl::Script DEBUG => 1;
 use autodie qw< :all >;
 
+use Path::Class;
+
 use Music;
+
+
+opts <<"-";
+	<album-or-track> <sort-mode>
+	<album-or-track> : either .mp3 file or directory full of .mp3 files
+	<sort-mode>      : how to modify the sortkey(s); possible values:
+	* <ALL-CAPS-KEY>   : artist set to <ALL-CAPS-KEY>, artist/album reset
+	* -<NNN>           : add -<NNN> to artist/album
+	* A:               : artist/album reset, drop -<NNN> if it exists
+	* T:               : album reset from album name, artist/album reset if soundtrack
+	* T:<ALL-CAPS-KEY> : album set to <ALL-CAPS-KEY>, artist/album reset if soundtrack
+	* VA               : artist/album set to album (regardless of whether soundtrack or not)
+-
 
 
 my $song = file(shift);
