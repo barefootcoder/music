@@ -22,7 +22,7 @@ sub HELP_MESSAGE
 	say STDERR "usage: $ME [-h] | <genre> | -l <file>";
 	say STDERR "           -l : find genres like this one";
 	say STDERR "           -h : this help message";
-	say STDERR "          <genre> : a genre (case-sensitive)";
+	say STDERR "          <genre> : a genre";
 	say STDERR "          <file>  : an MP3 file, or an album dir";
 	exit;
 }
@@ -34,7 +34,7 @@ say "searching for $genre ...";
 
 foreach_album_tag
 {
-	say $_->album_dir if $_->genre eq $genre;
+	say $_->album_dir if $_->genre =~ /$genre/io;
 };
 
 
