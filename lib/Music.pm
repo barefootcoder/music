@@ -17,7 +17,7 @@ use MusicCollection::Tag;
 use base 'Exporter';
 our @EXPORT = (@Music::Dirs::EXPORT,									# pass these along
 qw<
-	$ME set_album_dir usage_error fatal_error album_arg
+	$ME mpath set_album_dir usage_error fatal_error album_arg
 	album title filename alpha_filename sort_tracklist generate_tracklist rename_album
 	get_track_info
 	get_tag foreach_album_tag compare_song_times seconds denumerify format_sortkey
@@ -34,6 +34,28 @@ const our $ME => file($0)->basename;
 #		set_album_dir(from => $dir_containing_one_album);
 #		local $Music::AlbumDir = $dir_containing_album_dirs;
 our $AlbumDir = $ALBUM_DIR;
+
+func mpath ($path)
+{
+	my $MHOME = dir($MUSICHOME);					# because `resolve` is mutable, insanely
+
+	if ( -r $path )									# file or dir actually exists
+	{
+		debuggit(5 => "mpath returning: undef (based on $MHOME not contains $path)");
+		return undef unless $MHOME->contains($path) or $MHOME->resolve->contains($path);
+		$path = -d $path ? dir($path) : file($path);
+	}
+	else											# notional path
+	{
+		debuggit(5 => "mpath returning: undef (based on $MHOME not subsumes $path)");
+		return undef unless $MHOME->subsumes($path) or $MHOME->resolve->subsumes($path);
+		$path = file($path);
+	}
+	my $method = $path->isa('Path::Class::Dir') ? 'subdir' : 'file';
+	$path = $MUSICHOME->$method( $path->relative($MHOME) );
+	debuggit(5 => "mpath returning: $path (based on $MHOME, derived from $MUSICHOME)");
+	return $path;
+}
 
 func set_album_dir (:$from, :$to)
 {
@@ -108,30 +130,28 @@ func album_arg ($arg)
 	debuggit(3 => "album_arg argument is", $arg);
 
 	$arg =~ s{/$}{};			# trailing slash really borks ->basename
-	$arg = file($arg);
-	usage_error("can't read the file: $arg") unless -r $arg;
+	my $path = mpath($arg) or fatal_error("I have no idea what '$arg' is");
+	usage_error("can't read the file: $path") unless -r $path;
 
-	if (is_tracklist($arg))
+	if (is_tracklist($path))
 	{
 		debuggit(4 => "album_arg argument is a tracklist");
-		my $album = $arg->basename =~ s/\.m3u$//r;
+		my $album = $path->basename =~ s/\.m3u$//r;
 		return wantarray ? ($album, 'tracklist') : $album;
 	}
-	elsif (is_album_dir($arg))
+	elsif (is_album_dir($path))
 	{
 		debuggit(4 => "album_arg argument is an album");
-		my $album = $arg->basename;
+		my $album = $path->basename;
 		debuggit(3 => "album_arg album:", $album);
 		return wantarray ? ($album, 'album') : $album;
 	}
-	elsif ($MUSICHOME->resolve->contains($arg))
+	else
 	{
 		debuggit(4 => "album_arg argument is underneath MUSICHOME");
-		my $path = $arg->relative($MUSICHOME);
+		# because, if it wasn't, we would have bailed out up above
 		return wantarray ? ($path, 'base') : $path;
 	}
-
-	fatal_error("I have no idea what '$1' is");
 }
 
 

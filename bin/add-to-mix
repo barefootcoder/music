@@ -7,6 +7,7 @@ use File::Next;
 use File::Basename;
 
 use Music;
+use Music::Dirs;
 
 
 my $pattern = shift;
@@ -36,8 +37,7 @@ foreach (@ARGV)
 		my $pattern = qr/$artist$SEP$anchor_front\Q$_\E$anchor_back\.mp3/i;
 		debuggit(2 => "pattern:", $pattern);
 
-		my $finder = File::Next::files( { file_filter => sub { /$pattern/ } },
-				$ALBUM_DIR, $SINGLES_DIR, $MISC_DIR, $XMAS_DIR);
+		my $finder = File::Next::files( { file_filter => sub { /$pattern/ } }, track_dirs());
 		my @candidates;
 		push @candidates, $_ while $_ = $finder->();
 		if (@candidates == 0)
@@ -53,7 +53,8 @@ foreach (@ARGV)
 			$_ = $candidates[0];
 		}
 	}
-	push @files, file($_)->absolute;
+	my $p = mpath($_) or die("file is not underneath MUSICHOME");
+	push @files, $p;
 }
 debuggit(3 => "going to add files:", DUMP => \@files);
 
