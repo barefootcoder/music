@@ -34,9 +34,14 @@ func album_dirs ()
 	return ($ALBUM_DIR, $MISC_DIR);
 }
 
+func single_dirs ()
+{
+	return ($SINGLES_DIR, $XMAS_DIR);
+}
+
 func track_dirs ()
 {
-	return (album_dirs, $SINGLES_DIR, $XMAS_DIR);
+	return (album_dirs, single_dirs);
 }
 
 func all_albums ()
