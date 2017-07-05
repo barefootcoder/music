@@ -20,7 +20,7 @@ qw<
 	$ME mpath set_album_dir usage_error fatal_error album_arg
 	album title filename alpha_filename sort_tracklist generate_tracklist rename_album
 	get_track_info
-	get_tag foreach_album_tag compare_song_times seconds denumerify format_sortkey
+	get_tag foreach_album_tag compare_song_times to_seconds denumerify format_sortkey
 	attach_album_art extract_album_art
 	rebuild_playlists find_tracklists_containing cover_file
 >);
@@ -379,7 +379,7 @@ func get_track_info ($url)
 }
 
 
-func seconds ($time)
+func to_seconds ($time)
 {
 	my ($min, $sec) = split(':', $time);
 	return $min * 60 + $sec;
@@ -387,8 +387,8 @@ func seconds ($time)
 
 func compare_song_times ($lhs, $rhs)
 {
-	$lhs = seconds($lhs);
-	$rhs = seconds($rhs);
+	$lhs = to_seconds($lhs);
+	$rhs = to_seconds($rhs);
 	debuggit(3 => "comparing times:", $lhs, "to", $rhs);
 
 	my $diff = $lhs - $rhs;
