@@ -41,20 +41,36 @@ func mpath ($path)
 
 	if ( -r $path )									# file or dir actually exists
 	{
-		debuggit(5 => "mpath returning: undef (based on $MHOME not contains $path)");
-		return undef unless $MHOME->contains($path) or $MHOME->resolve->contains($path);
-		$path = -d $path ? dir($path) : file($path);
+		my $p = file($path)->absolute->resolve;
+		my $pi = $p->stat->ino;
+		my @pieces = $p->components;
+		my @target;
+		while (@pieces)
+		{
+			unshift @target, pop @pieces;
+			my $t = file($MUSICHOME, @target);
+			if (-r $t and $t->stat->ino == $pi)
+			{
+				debuggit(5 => "mpath returning: $t based on $path reachable from $MHOME");
+				return -d $t ? dir($t) : $t;
+			}
+		}
+		debuggit(5 => "mpath returning: undef based on $p not reachable from $MHOME");
+		return undef;
 	}
 	else											# notional path
 	{
-		debuggit(5 => "mpath returning: undef (based on $MHOME not subsumes $path)");
-		return undef unless $MHOME->subsumes($path) or $MHOME->resolve->subsumes($path);
+		unless ( $MHOME->subsumes($path) or $MHOME->resolve->subsumes($path) )
+		{
+			debuggit(5 => "mpath returning: undef based on $MHOME not subsumes $path");
+			return undef;
+		}
 		$path = file($path);
+		my $method = $path->isa('Path::Class::Dir') ? 'subdir' : 'file';
+		$path = $MUSICHOME->$method( $path->relative($MHOME) );
+		debuggit(5 => "mpath returning: $path (based on $MHOME, derived from $MUSICHOME)");
+		return $path;
 	}
-	my $method = $path->isa('Path::Class::Dir') ? 'subdir' : 'file';
-	$path = $MUSICHOME->$method( $path->relative($MHOME) );
-	debuggit(5 => "mpath returning: $path (based on $MHOME, derived from $MUSICHOME)");
-	return $path;
 }
 
 func set_album_dir (:$from, :$to)

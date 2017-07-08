@@ -15,7 +15,7 @@ mpath("foo");
 is $MUSICHOME, $orig_home, "MUSICHOME survives immutability test";
 
 
-is mpath($0), undef, "mpath rejects real paths not under MUSICHOME";
+is mpath($0), "$MUSICHOME/$0", "mpath accepts real paths symlinked under MUSICHOME";
 is mpath("/foo"), undef, "mpath rejects notional paths not under MUSICHOME";
 
 my $test_file = "$MUSICHOME/foo";

@@ -53,7 +53,7 @@ foreach (@ARGV)
 			$_ = $candidates[0];
 		}
 	}
-	my $p = mpath($_) or die("file is not underneath MUSICHOME");
+	my $p = mpath($_) or die("file $_ is not underneath MUSICHOME");
 	push @files, $p;
 }
 debuggit(3 => "going to add files:", DUMP => \@files);
