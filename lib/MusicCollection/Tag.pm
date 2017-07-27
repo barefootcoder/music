@@ -203,7 +203,7 @@ class MusicCollection::Tag
 				$value = "{$keys}";
 			}
 		}
-		elsif ( $self->_is_binary($value) )
+		if ( $self->_is_binary($value) )
 		{
 			$value = '<<BINARY>>';
 		}
