@@ -14,7 +14,8 @@ for file in "$1"/*
 do
 	has_comment=0
 	has_subtitle=0
-	tags="$(show-tags "$file" | fgrep -v "TXXX[Acoustid Id]" | fgrep -v "TXXX[ASIN]")"
+	tags="$(show-tags "$file" | fgrep -v "TXXX[Acoustid Id]" | fgrep -v "TXXX[ASIN]"							\
+			| grep -Pv "UFID(\[| \{)http://musicbrainz\.org[}\]]")"
 	if echo "$tags" | egrep -q 'COMM\((XXX|eng)\)'
 	then
 		has_comment=1
@@ -28,7 +29,6 @@ do
 		first=1
 		pattern="APIC\(Cover \(front\)\)\[Cover Art]"
 		pattern="$pattern|TXXX\[MusicBrainz \w+ Id]"
-		pattern="$pattern|UFID(\[| \{)http://musicbrainz\.org[}\]]"
 		echo "$tags" | tail -n+2 | grep -Pv "$pattern"
 		if echo "$tags" | grep -q APIC
 		then
@@ -43,7 +43,6 @@ do
 		if echo "$tags" | grep -q TPOS
 		then
 			multi_disc=1
-			echo "!!! MULTI-DISC ALBUM !!!"
 		fi
 		expected_frames=
 		[[ $has_pic == 1 ]] && expected_frames="| has cover art "
