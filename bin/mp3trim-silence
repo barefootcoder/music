@@ -1,0 +1,9 @@
+#! /bin/bash
+source ~/bin/bash_funcs
+
+infile=$1
+outdir=$MUSICHOME/alt/mix
+outfile=$outdir/$(basename "$infile")
+[[ -e $outfile ]] && die "$outfile already exists and will not overwrite; remove it first"
+
+mp3splt -r -d $outdir -o @f "$infile"

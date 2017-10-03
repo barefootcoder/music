@@ -1,0 +1,30 @@
+#! /usr/bin/env perl
+
+use myperl;
+use autodie ':all';
+
+use File::Which;
+
+use MP3::Tag;
+use MP3::Info;
+
+use Music;
+
+
+die("must supply MP3 file to operate on") unless @ARGV;
+my $mp3file = file(shift);
+die("file $mp3file doesn't exist or is wrong format") unless -f $mp3file and $mp3file =~ /\.mp3$/;
+
+my $sox = which('sox');
+die("cannot locate \`sox\`; maybe you need to install it?") unless $sox;
+
+
+my $info = MP3::Info->new("$mp3file");
+my $bitrate = $info->bitrate;
+
+my $bakfile = $MUSICHOME->file( alt => trimmed => $mp3file->basename );
+die("backup file $bakfile already exists") if -e $bakfile;
+system('mv', $mp3file, $bakfile);
+
+system( $sox, $bakfile, '-C', $bitrate, $mp3file, qw< reverse silence 1 0.1 0.1% reverse >);
+system( 'mp3cptags', '-f', $bakfile, $mp3file );
