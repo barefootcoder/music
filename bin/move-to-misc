@@ -1,0 +1,16 @@
+#! /bin/bash
+
+funcs=$MUSICHOME/etc/functions
+[[ -r $funcs ]] || { echo "$0: can't load functions" >&2 && exit 1; }
+ARGTYPE=set
+. $funcs
+
+if [[ $ARGTYPE != album || ! -d Albums/$ARG ]]
+then
+	echo "$me: pass me an album directory to move" >&2
+	exit 2
+fi
+
+mv Albums/"$ARG" Misc
+remake_tracklist Misc/"$ARG"
+chkalbum $(album tracklist "$ARG")
