@@ -17,7 +17,7 @@ opts <<"-";
 	* A:               : artist/album reset, drop -<NNN> if it exists
 	* T:               : album reset from album name, artist/album reset if soundtrack
 	* T:<ALL-CAPS-KEY> : album set to <ALL-CAPS-KEY>, artist/album reset if soundtrack
-	* VA               : artist/album set to album (regardless of whether soundtrack or not)
+	* :VA              : artist/album set to album (regardless of whether soundtrack or not)
 -
 
 
@@ -48,8 +48,8 @@ foreach ($album ? $album->children : $song)
 {
 	my $tag = get_tag($_);
 
-	my $album_so = $tag->get_frame('TSO2');
-	my $artist_so = $tag->get_frame('TSOP');
+	my $album_so = $tag->get_frame('TSO2') // '';
+	my $artist_so = $tag->get_frame('TSOP') // '';
 	given ($mode)
 	{
 		when ('replace')
