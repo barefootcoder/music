@@ -1,0 +1,2 @@
+#!/bin/bash
+lines "$1,/^$/" $MUSICHOME/mixes/mixes | head -n-1 | add-to-mix $2

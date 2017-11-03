@@ -21,7 +21,8 @@ say "Adding to mix: $mix";
 
 const my $SEP => qr/ - /;
 my @files;
-foreach (@ARGV)
+my @args = @ARGV ? @ARGV : args_from_stdin();
+foreach (@args)
 {
 	debuggit(4 => "current arg is", $_);
 	if (m{/} and not m{//})
@@ -61,3 +62,19 @@ debuggit(3 => "going to add files:", DUMP => \@files);
 open(OUT, ">>$mix");
 say && say OUT foreach @files;
 close(OUT);
+
+
+sub args_from_stdin
+{
+	gather
+	{
+		while ( <> )
+		{
+			chomp;
+			s/^.{4} //;
+			s/\t.*$//;
+			my ($song, $artist) = /(.*?) - (.*)/;
+			take lc "$artist//:$song:";
+		}
+	}
+}
