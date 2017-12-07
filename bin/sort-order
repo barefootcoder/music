@@ -33,7 +33,7 @@ my $sortkey = uc shift;
 my $mode;
 given ($sortkey)
 {
-	$mode = 'replace'					when /^[A-Z]+$/;
+	$mode = 'replace'					when /^[A-Z+]+$/;
 	$mode = 'append'					when /^-\d+$/;
 	$mode = 'title-reset'				when /^T:$/;
 	$mode = 'artist-reset'				when /^A:$/;
