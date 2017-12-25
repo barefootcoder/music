@@ -1,0 +1,71 @@
+#! /usr/bin/env perl
+
+use myperl::Script;
+use Path::Class;
+
+
+const my $TRACKLIST_DIR => dir( $ENV{MUSICHOME}, tracklists => misc  => );
+
+opts <<'-';
+    [-n] -R <num> | <pattern> | <tracklist>
+	-n : dry run: don't build the tracklist, just say what tracks you picked
+    -R : pick <num> random selections from the queue
+    <pattern>   : get all selections from the queue matching <pattern>
+	<tracklist> : get all tracks from <tracklist> *except* those already in mixes
+	results in: tracklists/misc/temporary.m3u
+-
+
+
+sub get_tracks ($)
+{
+	apply { chomp } grep { not /^#/ } file(shift)->slurp;
+}
+
+
+my ($pattern) = @ARGV;
+my @tracks;
+if ($pattern =~ /\.m3u$/ and -r $pattern)
+{
+	@tracks = find_tracks_not_in($pattern);
+}
+else
+{
+	@tracks = get_tracks $TRACKLIST_DIR->file('qqueue.m3u');
+	if ($OPT{R})
+	{
+		my $max_idx = $OPT{R} - 1;						# go from 1-based to 0-based
+		@tracks = (shuffle @tracks)[0..$max_idx];
+	}
+	else
+	{
+		@tracks = grep { /$pattern/io } @tracks;
+	}
+}
+
+if ($OPT{n})
+{
+	say "WOULD HAVE BUILT:";
+	say foreach @tracks;
+}
+else
+{
+	$TRACKLIST_DIR->file('temporary.m3u')->spew([
+		map   { "$_$/"                 }
+		apply { say file($_)->basename }
+			 @tracks
+	]);
+}
+
+
+sub find_tracks_not_in
+{
+	my ($basefile) = @_;
+	my @mix_tracks =
+		uniq
+		map  { get_tracks $_								}
+		map  { glob("$_/*.m3u")								}
+		map  { dir( $ENV{MUSICHOME}, tracklists => $_ )		}
+			qw< mixes moods Merrick Perrin >;
+
+	return grep { not $_ ~~ @mix_tracks } get_tracks $basefile;
+}
