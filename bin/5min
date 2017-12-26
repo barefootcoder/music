@@ -1,0 +1,2 @@
+#!/bin/bash
+perl -MDate::Easy -pe 'BEGIN { $d = datetime(shift) - 5*minutes } s|.*/| : |; s/.mp3//; s/^/($d += 5*minutes)->as(":HM")/e' ${1:-10:10} tracklists/misc/5minutes.m3u
