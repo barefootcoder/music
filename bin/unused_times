@@ -1,0 +1,11 @@
+#! /usr/bin/env perl
+
+use 5.14.0;
+use warnings;
+use autodie ':all';
+
+use Path::Tiny;
+use PerlX::bash ':all';
+
+
+bash 'mp3time', map { path($_) } tail +2 => bash \lines => qw< temp-tracklist -n >, path(shift) ;
