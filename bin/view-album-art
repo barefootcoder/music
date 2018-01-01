@@ -1,0 +1,35 @@
+#!/usr/bin/env perl
+
+use myperl DEBUG => 1;
+use autodie qw< :all >;
+
+use File::Temp qw< tempfile >;
+
+use Music;
+
+
+my $mp3 = shift;
+die("must supply valid MP3 file") unless $mp3 and -r $mp3;
+
+my $image = extract_album_art($mp3);
+die("can't get image out of source file: $mp3") unless $image;
+
+my ($fh, $filename) = tempfile( UNLINK => 1 );
+binmode($fh);
+print $fh $image;
+close($fh);
+
+# this is stolen from common:bin/check-img
+# possibly should be commonolized somewhere
+my $viewer = first { -x "/usr/bin/$_" } qw< eom xviewer >;
+system("$viewer $filename");
+
+# xviewer detaches itself from the terminal
+# which makes it look like it exits immediately
+# which makes this script exit
+# which removes the tempfile
+# which make xview say there's no image in the file
+# (because the file is totally gone)
+# so this hacky workaround <sigh>
+print "PRESS ENTER TO CONTINUE ...";
+<STDIN>;
