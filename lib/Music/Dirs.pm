@@ -6,13 +6,14 @@ use base 'Exporter';
 our @EXPORT =
 (
 	qw< $MUSICHOME $ALBUM_DIR $MISC_DIR $SINGLES_DIR $XMAS_DIR $TRACKLIST_DIR >,
-	qw< is_album_dir is_tracklist album_dirs track_dirs all_albums >
+	qw< is_album_dir is_tracklist single_dirs album_dirs track_dirs all_albums >
 );
 
 
 const our $MUSICHOME => dir($ENV{'MUSICHOME'});
 const our $ALBUM_DIR => $MUSICHOME->subdir('Albums');
 const our $MISC_DIR => $MUSICHOME->subdir('Misc');
+const our $CHRISTY_DIR => $MUSICHOME->subdir('Christy');
 const our $SINGLES_DIR => $MUSICHOME->subdir('Singles');
 const our $XMAS_DIR => $MUSICHOME->subdir('xmas');
 const our $TRACKLIST_DIR => $MUSICHOME->subdir('tracklists');
@@ -31,7 +32,7 @@ func is_tracklist ($file)
 
 func album_dirs ()
 {
-	return ($ALBUM_DIR, $MISC_DIR);
+	return ($ALBUM_DIR, $CHRISTY_DIR, $MISC_DIR);
 }
 
 func single_dirs ()

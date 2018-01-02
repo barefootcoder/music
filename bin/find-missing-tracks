@@ -9,6 +9,7 @@ use Getopt::Std;
 use Path::Class;
 
 use Music;
+use Music::Dirs;
 
 
 opts <<"-";
@@ -124,10 +125,10 @@ func find_replacement ($song)
 {
 	state $ALL_SONGS =
 	{
-		map { make_key($_->basename) => $_ }
-		grep { /\.mp3$/ }
-		map { $_->children }
-		($SINGLES_DIR, $ALBUM_DIR->children, $MISC_DIR->children)
+		map  { make_key($_->basename) => $_                     }
+		grep { /\.mp3$/                                         }
+		map  { $_->children                                     }
+		     ( single_dirs(), map { $_->children } album_dirs() )
 	};
 
 	return $ALL_SONGS->{ make_key($song) };
