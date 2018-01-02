@@ -1,0 +1,55 @@
+#! /usr/bin/env perl
+
+use myperl::Script;
+use autodie qw< :all >;
+
+use Path::Tiny;
+
+use Music;
+use Music::Dirs;
+
+
+opts <<"-";
+	[-n] <album> <new-album-dir>
+	-n : dry run (do not move, just say what you would have done)
+	<album>         : an album (basename, dir name, or tracklist)
+	<new-album-dir> : one of: @{[ map { $_->basename } album_dirs() ]}
+-
+
+
+sub quote_filename
+{
+	my $f = @_ ? shift : $_;
+	if ( $f =~ m/[ \$'"\\#;!|\[{(<>)}\]]/ )
+	{
+		$f =~ s/'/'\\''/g;
+		$f = qq|'$f'|;
+	}
+	return $f;
+}
+
+
+my $album = album_arg(shift);
+my $dest = path(shift // usage_error("must supply album destination"));
+$dest = first { $dest->realpath eq path($_)->realpath ? $_ : undef } album_dirs();
+usage_error("unrecognized album destination") unless $dest;
+
+my $old_dir = album(dir => $album);
+my $new_dir = $dest->subdir($album);
+
+my @commands;
+push @commands, [ mv => map { quote_filename } $old_dir, $new_dir ];
+push @commands, [ remake_tracklist => quote_filename $new_dir ];
+push @commands, [ chkalbum => quote_filename album(tracklist => $album) ];
+push @commands, [ 'find-missing-tracks', -F => 'tracklists/*/*.m3u' ];
+
+if ($OPT{n})
+{
+	say '';
+	say "would run: $_" foreach map { "@$_" } @commands;
+	say '';
+}
+else
+{
+	system("@$_") foreach @commands;
+}
