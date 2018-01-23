@@ -73,7 +73,9 @@ sub args_from_stdin
 			chomp;
 			s/^.{4} //;
 			s/\t.*$//;
+			s/\s+\[.*\]$//;
 			my ($song, $artist) = /(.*?) - (.*)/;
+			die("can't determine song/artist [$_]") unless $song and $artist;
 			take lc "$artist//:$song:";
 		}
 	}
