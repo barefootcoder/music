@@ -24,7 +24,7 @@ sub get_tracks ($)
 
 my ($pattern) = @ARGV;
 my @tracks;
-if ($pattern =~ /\.m3u$/ and -r $pattern)
+if ($pattern and $pattern =~ /\.m3u$/ and -r $pattern)
 {
 	@tracks = find_tracks_not_in($pattern);
 }
