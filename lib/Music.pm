@@ -12,15 +12,16 @@ use File::Basename;
 use Text::Capitalize;
 
 use Music::Dirs;
+use Music::Time;
 use MusicCollection::Tag;
 
 use base 'Exporter';
-our @EXPORT = (@Music::Dirs::EXPORT,									# pass these along
+our @EXPORT = (@Music::Dirs::EXPORT, @Music::Time::EXPORT,				# pass these along
 qw<
 	$ME mpath set_album_dir usage_error fatal_error album_arg
 	album title filename alpha_filename sort_tracklist generate_tracklist rename_album
 	get_track_info
-	get_tag foreach_album_tag compare_song_times to_seconds denumerify format_sortkey
+	get_tag foreach_album_tag denumerify format_sortkey
 	attach_album_art extract_album_art
 	rebuild_playlists find_tracklists_containing cover_file
 >);
@@ -392,24 +393,6 @@ func get_track_info ($url)
 	debuggit(3 => "track info:", DUMP => $track_info);
 
 	return $track_info;
-}
-
-
-func to_seconds ($time)
-{
-	my ($min, $sec) = split(':', $time);
-	return $min * 60 + $sec;
-}
-
-func compare_song_times ($lhs, $rhs)
-{
-	$lhs = to_seconds($lhs);
-	$rhs = to_seconds($rhs);
-	debuggit(3 => "comparing times:", $lhs, "to", $rhs);
-
-	my $diff = $lhs - $rhs;
-	return 0 if $diff >= -1 and $diff <= 1;								# only 1 second off counts as equal
-	return $diff < 0 ? -1 : 1;											# else normalize to -1 or 1, like <=> or cmp
 }
 
 

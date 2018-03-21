@@ -18,7 +18,7 @@ my $lhs = gather_info($lh_file);
 my $rhs = gather_info($rh_file);
 debuggit(3 => "lhs:", DUMP => $lhs, "rhs:", DUMP => $rhs);
 
-print_diff(time => $lhs->{'time'}, $rhs->{'time'}) unless compare_song_times($lhs->{'time'}, $rhs->{'time'}) == 0;
+print_diff(time => $lhs->{'time'}, $rhs->{'time'}) unless compare_times($lhs->{'time'}, $rhs->{'time'}) == 0;
 foreach (qw< bitrate frequency >)
 {
 	print_diff($_ => $lhs->{$_}, $rhs->{$_}) unless $lhs->{$_} eq $rhs->{$_};

@@ -9,6 +9,7 @@ class MusicCollection::Tag
 	$MP3::Info::try_harder = 1;
 
 	use Music::Dirs;
+	use Music::Time;
 
 
 	# ATTRIBUTES
@@ -148,7 +149,7 @@ class MusicCollection::Tag
 	method sortkey		{ $self->get_frame('TSO2') // uc $self->album_dir }
 
 
-	method time			{ sprintf("%d:%02d", int($self->seconds / 60), $self->seconds % 60) }
+	method time			{ to_time($self->seconds) }	# to_time provided courtesy of Music::Time
 
 
 	# ACTION METHODS
