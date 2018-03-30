@@ -28,14 +28,13 @@ sub HELP_MESSAGE
 my ($from, $to) = @ARGV;
 die("$0: must supply from and to on command line") unless $from and $to;
 
-my $old_tag = MP3::Tag->new($from);
+my $old_tag = get_tag($from);
 die("couldn't get tag: $!") unless $old_tag;
-$old_tag->get_tags;
 
-my $new_tag = MP3::Tag->new($to);
-$new_tag->config( write_v24 => 1 );
+# check if we're going to blow away anything important
 {																		# remove existing tags
-	if ($new_tag->delete_tag("ID3v1"))
+	my $new_tag = get_tag($to);
+	if ($new_tag->has_v1)
 	{
 		unless ($opts->{f})
 		{
@@ -43,33 +42,21 @@ $new_tag->config( write_v24 => 1 );
 			exit 1 unless confirm "Are you sure?";
 		}
 	}
-	if ($new_tag->delete_tag("ID3v2"))
+	if ($new_tag->has_v2)
 	{
 		unless ($opts->{f})
 		{
 			warn "\nExisting ID3v2 tag will be destroyed!!!\n";
 			warn "  Existing frames:\n";
-			warn "    $_\n" foreach $new_tag->id3v2_frame_descriptors;
+			$new_tag->print_frames(prefix => '    ', out => \*STDERR);
 			exit 1 unless confirm "Are you sure?";
 		}
 	}
-	$new_tag->update_tags;
+	$new_tag->drop;
 }
-$new_tag = MP3::Tag->new($to);											# reread after deletion
-$new_tag->config( write_v24 => 1 );
-{																		# add ID3v1 tag
-	$new_tag->{ID3v1} = $old_tag->{ID3v1};
-}
-{																		# add ID3v2 tag
-	# delete whatever's in the new tag
-	# (should have been deleted above, but that doesn't seem to work)
-	$new_tag->select_id3v2_frame_by_descr($_, undef) foreach $new_tag->id3v2_frame_descriptors;
 
-	# copy from the old tag
-	# (the 'delete' here should be redundant, but can't hurt)
-	$old_tag->copy_id3v2_frames($new_tag, 'delete', 1);
-}
-$new_tag->update_tags;
+# do the deed
+$old_tag->attach($to)->save;
 
 # finally, rename file, if the user is cool with that
 if ($opts->{f} or confirm "Do you want to rename the new file with the old file's name?")

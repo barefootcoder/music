@@ -21,5 +21,5 @@ sub show
 	my ($file) = @_;
 
 	say basename($file);
-	get_tag($file)->print_frames('    ');
+	get_tag($file)->print_frames(prefix => '    ');
 }

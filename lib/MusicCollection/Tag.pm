@@ -5,8 +5,8 @@ class MusicCollection::Tag
 {
 	use Carp;
 	use MP3::Tag;
-	use MP3::Info;
-	$MP3::Info::try_harder = 1;
+	use MP3::Info;  $MP3::Info::try_harder = 1;
+	use List::AllUtils qw< pairgrep pairkeys >;
 
 	use Music::Dirs;
 	use Music::Time;
@@ -162,9 +162,9 @@ class MusicCollection::Tag
 	}
 
 
-	method print_frames ($prefix = '')
+	method print_frames (:$prefix = '', :$out = \*STDOUT)
 	{
-		printf "$prefix%-40s => %s\n", $self->get_frame_for_display($_) foreach $self->frames;
+		printf $out "$prefix%-40s => %s\n", $self->get_frame_for_display($_) foreach $self->frames;
 	}
 
 
@@ -225,8 +225,43 @@ class MusicCollection::Tag
 
 	method rm_frame ($frame)
 	{
+		# don't try to use `remove_frame` here; it doesn't work
 		$self->set_frame($frame, undef);
 		return $self;													# for chaining
+	}
+
+
+	# Attach a tag to a whole new file, returning the newly created tag.
+	# You must choose to actually write the new tag out (by calling `save` on it).
+	# WARNING! This only works if the new file has no existing tag(s).
+	# Otherwise throws a fatal exception.
+	method attach ($file)
+	{
+		my $new_tag = ref($self)->new( file => $file );
+		# pseudo-Schwartzian transform to get the list of tag versions that currently exist
+		my $existing_tags = join('/', pairkeys pairgrep { $new_tag->$b } map { $_ => "has_$_" } qw< v1 v2 >);
+		croak("won't overwrite existing $existing_tags tag(s)") if $existing_tags;
+
+		# copy v1 tag
+		$new_tag->_tag->{ID3v1} = $self->_tag->{ID3v1};
+		# create v2 tag and copy frames
+		$new_tag->_tag->new_tag("ID3v2");
+		$self->_tag->copy_id3v2_frames($new_tag->_tag, 'delete', 1);
+
+		return $new_tag;
+	}
+
+
+	# Blow away any existing tags (both v1 and v2).
+	# This deletes the tags in memory *AND* on disk!!!
+	# Once you call this, don't try to do further operations on the tag.
+	method drop ()
+	{
+		# remove v1 tag directly
+		$self->_tag->delete_tag("ID3v1");
+		# remove v2 tag (this rewrites the file)
+		$self->_tag->{ID3v2}->remove_tag;;
+		return undef;													# explicitly disable chaining
 	}
 
 }
