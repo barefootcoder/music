@@ -45,11 +45,11 @@ do
 			multi_disc=1
 		fi
 		expected_frames=
-		[[ $has_pic == 1 ]] && expected_frames="| has cover art "
-		[[ $has_fingerprint == 1 ]] && expected_frames="| has fingerprint "
-		[[ $has_subtitle == 1 ]] && expected_frames="| has subtitle "
-		[[ $has_website == 1 ]] && expected_frames="| has website "
-		[[ $multi_disc == 1 ]] && expected_frames="| is multi-disc "
+		[[ $has_pic == 1 ]] && expected_frames="$expected_frames| has cover art "
+		[[ $has_fingerprint == 1 ]] && expected_frames="$expected_frames| has fingerprint "
+		[[ $has_subtitle == 1 ]] && expected_frames="$expected_frames| has subtitle "
+		[[ $has_website == 1 ]] && expected_frames="$expected_frames| has website "
+		[[ $multi_disc == 1 ]] && expected_frames="$expected_frames| is multi-disc "
 		echo "...frames: $expected_frames|"
 	else
 		if [[ $has_comment == 1 ]]
