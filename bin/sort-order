@@ -90,6 +90,7 @@ foreach ($album ? $album->children : $song)
 		}
 	}
 
-	printf("%-10s %-15s - %-50s\n", $tag->get_frame('TSOP'), $tag->get_frame($mode =~ /^title-/ ? 'TSOA' : 'TSO2'), $_);
+	printf("%-10s %-15s - %-50s\n",
+			$tag->get_frame('TSOP') // '???', $tag->get_frame($mode =~ /^title-/ ? 'TSOA' : 'TSO2'), $_);
 	$tag->save;
 }
