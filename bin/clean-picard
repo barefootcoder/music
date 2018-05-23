@@ -263,9 +263,11 @@ foreach ($target eq 'dir' ? sort_tracklist $album->children : $mp3)
 
 	# track number just gets the fixup
 	$frame = 'TRCK';
-	my $track = $tag->get_frame($frame);
-	$track =~ s{/\d+$}{};
-	$tag->set_frame($frame => $track);
+	if ( my $track = $tag->get_frame($frame) )
+	{
+		$track =~ s{/\d+$}{};
+		$tag->set_frame($frame => $track);
+	}
 
 	if ($tag->get_frame('TSO2'))
 	{
