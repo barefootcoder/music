@@ -7,14 +7,18 @@ class MusicCollection::Tag
 	use MP3::Tag;
 	use MP3::Info;  $MP3::Info::try_harder = 1;
 	use List::AllUtils qw< pairgrep pairkeys >;
+	use Moose::Util::TypeConstraints qw< duck_type >;
 
 	use Music::Dirs;
 	use Music::Time;
 
+	my $PathFile = duck_type [qw< dir      >];
+	my $PathDir  = duck_type [qw< children >];
+
 
 	# ATTRIBUTES
-	has file		=>	( ro, isa => 'Path::Class::File', lazy, builder => '_get_sample_file' );
-	has dir			=>	( ro, isa => 'Path::Class::Dir', predicate => 'is_album' );
+	has file		=>	( ro, isa => $PathFile, lazy, builder => '_get_sample_file' );
+	has dir			=>	( ro, isa => $PathDir, predicate => 'is_album' );
 	has _tag		=>	( rw, isa => 'MP3::Tag', lazy, builder => '_get_tag',
 								handles =>	{
 												tracknum => 'track1', discnum => 'disk1',
@@ -38,14 +42,14 @@ class MusicCollection::Tag
 	{
 		if (exists $args{'file'})
 		{
-			if ( not ( blessed $args{'file'} and $args{'file'}->isa('Path::Class::File') ) )
+			if ( not $PathFile->check( $args{'file'} ) )
 			{
 				$args{'file'} = file($args{'file'});
 			}
 		}
 		elsif (exists $args{'dir'})
 		{
-			if ( not ( blessed $args{'dir'} and $args{'dir'}->isa('Path::Class::Dir') ) )
+			if ( not $PathDir->check( $args{'dir'} ) )
 			{
 				$args{'dir'} = dir($args{'dir'});
 			}
