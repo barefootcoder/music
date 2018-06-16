@@ -416,7 +416,7 @@ func format_sortkey ($text)
 	return 'CHKCHKCHK' if $text eq '!!!';								# this is how they claim you should pronounce it
 
 	# I don't think this order can be messed with much, if at all
-	return uc denumerify(filename($text)) =~ s/, The$//r =~ s/^The //r =~ s/\W//gr;
+	return uc denumerify(filename($text)) =~ s/, The$//r =~ s/^The //r =~ s/^An? //r =~ s/\W//gr;
 }
 
 

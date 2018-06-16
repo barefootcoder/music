@@ -67,7 +67,7 @@ foreach ($album ? $album->children : $song)
 
 		when ('title-reset')
 		{
-			$tag->set_frame(TSOA => format_sortkey($tag->album =~ s/^The //r =~ s/^An? //r));
+			$tag->set_frame(TSOA => format_sortkey($tag->album));
 			$tag->set_frame(TSO2 => $tag->get_frame('TSOA')) if $tag->genre =~ 'Soundtrack';
 		}
 

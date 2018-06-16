@@ -273,6 +273,7 @@ foreach ($target eq 'dir' ? sort_tracklist $album->children : $mp3)
 	{
 		# for artist and album sort (and album artist sort), make sure sortkeys are set properly
 		$tag->get_frame($_) and $tag->set_frame($_ => format_sortkey($tag->get_frame($_))) foreach qw< TSOA TSO2 >;
+		$tag->set_frame(TSOA => format_sortkey($tag->album)) unless $tag->get_frame('TSOA');
 		$tag->set_frame(TSOP => $type eq 'artist' ? $tag->get_frame('TSO2') : format_sortkey($tag->artist));
 
 		# artist+album sort should sort albums by the same artist chronologically
