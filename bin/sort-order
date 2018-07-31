@@ -39,6 +39,7 @@ given ($sortkey)
 	$mode = 'artist-reset'				when /^A:$/;
 	$mode = 'title-replace'				when /^T:.+$/;
 	$mode = 'force-va'					when /^:VA$/;
+	$mode = 'everything-reset'			when /^E:.+$/;
 	die("weird sortkey: $sortkey");		# otherwise
 }
 
@@ -87,6 +88,16 @@ foreach ($album ? $album->children : $song)
 		when ('force-va')
 		{
 			$tag->set_frame(TSO2 => $tag->get_frame('TSOA'));
+		}
+
+		when ('everything-reset')
+		{
+			$sortkey =~ s/^E://;
+			my $year = $tag->year;
+			my $album = format_sortkey($tag->album);
+			$tag->set_frame(TSOP => $sortkey);
+			$tag->set_frame(TSOA => $album);
+			$tag->set_frame(TSO2 => $tag->genre =~ 'Soundtrack' ? $album : "$sortkey$year");
 		}
 	}
 
