@@ -38,32 +38,35 @@ system( unzip => $zip );
 system( qw< chmod +w >, glob('*') );
 
 
-# handle coverfile, if any
-my $cover = glob("*.jpg");
-$cover //= glob("*.jpeg");
-debuggit(2 => "coverfile is", $cover);
-if ($cover)
-{
-	debuggit(5 => "trying to rename coverfile");
-	move $cover, cover_file($albumdir, '.jpg');
-}
+=for old-covers
 
+	# handle coverfile, if any
+	my ($cover) = (glob("*.jpg"), glob("*.jpeg"));
+	debuggit(2 => "coverfile is", $cover);
+	if ($cover)
+	{
+		debuggit(5 => "trying to rename coverfile");
+		$cover->move_to( cover_file($albumdir, '.jpg') );
+	}
 
-unlink $_ foreach glob('*.txt'), glob('*.m3u');
+=cut
+
+# nowadays, we don't care about coverfiles, so just ditch 'em along with other useless crap
+$_->remove foreach glob('*.txt'), glob('*.m3u'), glob('*.jpg'), glob('*.jpeg');
 
 =for old-way
 
-# let fixup_album do all the hard work
-# (but don't run chkalbum; we'll do that ourselves at the end
-system(qw< fixup_album -C >, $albumdir);
-# this is cheating a bit, but it's the quickest/easiest way to see what dir fixup_album created
-my $new_albumdir = `newest -bx1`;
-chomp $new_albumdir;
+	# let fixup_album do all the hard work
+	# (but don't run chkalbum; we'll do that ourselves at the end
+	system(qw< fixup_album -C >, $albumdir);
+	# this is cheating a bit, but it's the quickest/easiest way to see what dir fixup_album created
+	my $new_albumdir = `newest -bx1`;
+	chomp $new_albumdir;
 
-say "\nThe new album dir is shown above.";
-say "Please use kID3 to tweak the files as necessary.";
-say "Press RETURN when ready to continue.";
-scalar <STDIN>;
+	say "\nThe new album dir is shown above.";
+	say "Please use kID3 to tweak the files as necessary.";
+	say "Press RETURN when ready to continue.";
+	scalar <STDIN>;
 
 =cut
 
