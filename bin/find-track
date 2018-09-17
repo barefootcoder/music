@@ -4,6 +4,7 @@ use myperl;
 use autodie qw< :all >;
 
 use File::Next;
+use PerlX::bash;
 
 use Music;
 
@@ -20,7 +21,6 @@ if (@mixes)
 	foreach (@mixes)
 	{
 		say;
-		print "\t";
-		system(qw< grep -Pi >, "@ARGV", $_);
+		say foreach map { "\t$_" } bash \lines => qw< grep -Pi >, "@ARGV", $_;
 	}
 }
