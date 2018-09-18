@@ -13,7 +13,8 @@ my $tracks = File::Next::files({ file_filter => sub { /@ARGV/i } }, track_dirs()
 say file($_)->absolute while $_ = $tracks->();
 
 
-my @mixes = grep { grep { /@ARGV/i } $_->slurp } glob($TRACKLIST_DIR->file("[CRPMm]*", "*.m3u"));
+my $pattern = qr/@ARGV/i;
+my @mixes = grep { grep { /$pattern/ } $_->slurp } glob($TRACKLIST_DIR->file("[CRPMm]*", "*.m3u"));
 if (@mixes)
 {
 	say '';
@@ -21,6 +22,6 @@ if (@mixes)
 	foreach (@mixes)
 	{
 		say;
-		say foreach map { "\t$_" } bash \lines => qw< grep -Pi >, "@ARGV", $_;
+		say foreach map { "\t$_" } bash \lines => qw< ack >, $pattern, $_;
 	}
 }
