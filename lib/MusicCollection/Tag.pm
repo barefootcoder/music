@@ -124,7 +124,7 @@ class MusicCollection::Tag
 
 	method _dirs_are_equal ($dir1, $dir2)
 	{
-		return $dir1->absolute->resolve eq $dir2->absolute->resolve;
+		return $dir1->ef($dir2);
 	}
 
 
