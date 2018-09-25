@@ -18,6 +18,7 @@ opts <<"-";
 	* T:               : album reset from album name, artist/album reset if soundtrack
 	* T:<ALL-CAPS-KEY> : album set to <ALL-CAPS-KEY>, artist/album reset if soundtrack
 	* :VA              : artist/album set to album (regardless of whether soundtrack or not)
+	* E:<ALL-CAPS-KEY> : reset everything, as best you can
 -
 
 
