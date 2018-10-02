@@ -18,13 +18,36 @@ die("file $mp3file doesn't exist or is wrong format") unless -f $mp3file and $mp
 my $sox = which('sox');
 die("cannot locate \`sox\`; maybe you need to install it?") unless $sox;
 
+my $mode = shift // '';
+my @valid_modes = qw< swap chop >;
+die("invalid command; must be one of: @valid_modes") unless $mode ~~ @valid_modes;
+my $mode_arg = shift;
+
 
 my $info = MP3::Info->new("$mp3file");
 my $bitrate = $info->bitrate;
 
-my $bakfile = $MUSICHOME->file( alt => trimmed => $mp3file->basename );
-die("backup file $bakfile already exists") if -e $bakfile;
-system('mv', $mp3file, $bakfile);
+given ($mode)
+{
+	when ('swap')
+	{
+		my $bakfile = $MUSICHOME->file( alt => trimmed => $mp3file->basename );
+		die("backup file $bakfile already exists") if -e $bakfile;
+		say "trimming $mp3file in place; saving original to $bakfile";
+		system('mv', $mp3file, $bakfile);
 
-system( $sox, $bakfile, '-C', $bitrate, $mp3file, qw< reverse silence 1 0.1 0.1% reverse >);
-system( 'mp3cptags', '-f', $bakfile, $mp3file );
+		system( $sox, $bakfile, '-C', $bitrate, $mp3file, qw< reverse silence 1 0.1 0.1% reverse >);
+		system( 'mp3cptags', '-f', $bakfile, $mp3file );
+	}
+
+	when ('chop')
+	{
+		die("can't understand chop format: $mode_arg") unless $mode_arg =~ /^\d+:\d{2}/;
+		my $destfile = $MUSICHOME->file( alt => mix => $mp3file->basename );
+		say "chopping $mp3file to $mode_arg and trimming; saving result to $destfile";
+
+		system( $sox, $mp3file, '-C', $bitrate, $destfile, trim => 0, "=$mode_arg",
+				qw< reverse silence 1 0.1 0.1% reverse >);
+		system( 'mp3cptags', '-f', $mp3file, $destfile );
+	}
+}
