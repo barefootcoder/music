@@ -247,7 +247,7 @@ class MusicCollection::Tag
 		croak("won't overwrite existing $existing_tags tag(s)") if $existing_tags;
 
 		# copy v1 tag
-		$new_tag->_tag->{ID3v1} = $self->_tag->{ID3v1};
+		$new_tag->_tag->new_tag("ID3v1")->all( $self->_tag->{ID3v1}->all );
 		# create v2 tag and copy frames
 		$new_tag->_tag->new_tag("ID3v2");
 		$self->_tag->copy_id3v2_frames($new_tag->_tag, 'delete', 1);
