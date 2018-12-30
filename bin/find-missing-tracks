@@ -3,10 +3,9 @@
 use myperl::Script DEBUG => 1;
 use Method::Signatures;
 use autodie qw< :all >;
-use Carp::Always;
 
 use Getopt::Std;
-use Path::Class;
+use Path::Class::Tiny;
 
 use Music;
 use Music::Dirs;
