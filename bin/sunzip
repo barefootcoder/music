@@ -4,8 +4,8 @@ use myperl DEBUG => 1;
 use autodie qw< :all >;
 
 use MP3::Tag;
-use IO::Prompt;
 use File::Copy;
+use IO::Prompter;
 use File::Copy::Recursive qw< dircopy >;
 
 use Music;
