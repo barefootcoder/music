@@ -1,0 +1,220 @@
+#! /usr/bin/env perl
+
+use myperl::Script;
+use autodie ':all';
+
+use Roman;
+use Date::Easy;
+use Const::Fast;
+use Path::Class;
+use File::Which;
+
+use Music;
+
+
+const my $INSTRUCTION => qr/ (\w+) : \s* (.*) $/x;
+const my $GAPS => [qw< pregap postgap >];
+
+
+opts <<'-';
+    [-V<NUM>] [-n] [-q] <mode> <file>
+	-V : process volume <NUM>
+	-n : no action (dry run)
+	-q : quiet mode
+    reads mix spec file <file>
+	performs the action of <mode>:
+	display   : print volume as a mixfile block
+	tracklist : create tracklist (all volumes)
+	process   : create wav and mp3 files for mix
+-
+
+my ($mode, $file) = (shift, file(shift));
+usage_error("must supply both mode and file") unless $mode and $file;
+my $volume = $OPT{V} // 1;
+
+
+my $mix_name = $file->basename =~ s/\.mix$//r;
+my $volno = 1;
+my $header = {};
+my @volumes;
+foreach ( $file->slurp )
+{
+	chomp;
+	if ( /^$/ )										# blank line separates volumes
+	{
+		# only do this if we haven't already done it for this volume
+		# this allows multiple blank lines to separate
+		# (and also blank lines at the very top)
+		unless ($header)
+		{
+			++$volno;
+			$header = {};
+		}
+	}
+	elsif ( /^\h*#/ )								# comment
+	{
+		# just ignore
+	}
+	elsif ( /^\[(.*)\]$/ )							# volume title
+	{
+		$header->{title} = $1;
+	}
+	elsif ( s/^$INSTRUCTION// )						# volume instruction
+	{
+		my ($type, $instr) = ($1,$2);
+		if ($type ~~ $GAPS)
+		{
+			$header->{$type} = $instr;
+		}
+		else
+		{
+			fatal("unknown volume instruction: $type");
+		}
+	}
+	elsif ( /^-+$/ )								# header separator
+	{
+		# save the header to the array
+		# and clear it so we know we need to make a new one
+		$volumes[$volno] = $header;
+		undef $header;
+	}
+	elsif ( s/^\t+$INSTRUCTION// )					# track instruction
+	{
+		my ($type, $instr) = ($1,$2);
+		if ($type ~~ [qw< title artist >])
+		{
+			$type .= '_set';
+			$volumes[$volno]->{tracks}->[-1]->{tag}->$type($instr);
+		}
+		elsif ($type ~~ $GAPS)
+		{
+			# if there was a volume default, this will override it
+			# (which is what we want)
+			$volumes[$volno]->{tracks}->[-1]->{$type} = $instr;
+		}
+		else
+		{
+			fatal("unknown track instruction: $type");
+		}
+	}
+	else											# track
+	{
+		s/^(....) // or fatal("unknown track line: $_");
+		my $track = { file => file($_), flags => $1, tag => get_tag($_) };
+		my $curvol = $volumes[$volno];
+		for (@$GAPS)
+		{
+			$track->{$_} = $curvol->{$_} if $curvol->{$_};
+		}
+		push @{ $curvol->{tracks} }, $track;
+	}
+}
+
+my ($vol, $name, $title, $tracks) = get_volume($volume);
+
+given ($mode)
+{
+	when ('display')
+	{
+		my $named = grep { /^..=.$/ } map { $_->{flags} } @$tracks;
+		my $time = to_time(sum map { $_->{tag}->seconds } @$tracks);
+
+		my @headers;
+		push @headers, $name, "[$vol->{title}]",
+				scalar @$tracks . " tracks, time: $time, named: " . ($named ? 'yes' : 'no') . ", score: ???%";
+		say foreach @headers;
+		say '=' x (max map { length } @headers);
+		say join(' ', $_->{flags}, $_->{tag}->title, '-', $_->{tag}->artist) foreach @$tracks;
+	}
+
+	when ('tracklist')
+	{
+		warn("$ME: mode $_ will not restrict to a single volume\n") if $OPT{V};
+		foreach (1..$volno)
+		{
+			my ($vol, $name, $title, $tracks) = get_volume($_);
+			say "# $name";
+			say "# [$title]" if $title;
+			my $mp3_dir = mix_dir( mp3 => $name );
+			if ( -d $mp3_dir )
+			{
+				say foreach sort $mp3_dir->children;
+			}
+			else
+			{
+				say foreach map { $_->{file} } @$tracks;
+			}
+			say "# cut";
+		}
+	}
+
+	when ('process')
+	{
+		my $wav_dir = mix_dir( wav => $name );
+		$wav_dir->mkpath;
+		my $mp3_dir = mix_dir( mp3 => $name );
+		$mp3_dir->mkpath;
+		my $tracknum = 0;
+		# can't have pregap on track #1 or postgap on last track
+		delete $tracks->[ 0]->{pregap};
+		delete $tracks->[-1]->{postgap};
+		foreach (@$tracks)
+		{
+			say "Processing track ", ++$tracknum unless $OPT{q};
+			my $file = $_->{file};
+			my $tag  = $_->{tag};
+			my $base = filename(sprintf("%02d. %s - %s", $tracknum, $tag->artist, $tag->title)) =~ s/\|/--/gr;
+
+			# WAV
+			my $sox = which('sox');
+			my $wav = $wav_dir->file("$base.wav");
+			# SoX with input file; normalize volume to avoid clipping
+			my @cmd = ($sox, '--norm=-1', $file);
+			# set frequency and channels to output file
+			push @cmd, qw< -r 44100 -c 2 >, $wav;
+			# trim silence from end
+			push @cmd, qw< reverse silence 1 0.1 0.1% reverse >;
+			# add gaps (if appropriate)
+			if ( $_->{pregrap} or $_->{postgap} )
+			{
+				my $pre  = $_->{pregap}  // 0;
+				my $post = $_->{postgap} // 0;
+				push @cmd, pad => $pre, $post;
+			}
+			# now run it
+			# (or print it, in dry-run mode)
+			$OPT{n} ? say "=> @cmd" : system(@cmd);
+
+			# MP3
+			my $lame = which('lame');
+			my $mp3 = $mp3_dir->file("$base.mp3");
+			# just a conversion here
+			@cmd = ($lame, '--quiet', '--preset', 'standard', $wav, $mp3);
+			$OPT{n} ? say "=> @cmd" : system(@cmd);
+			# tweak and write the tag
+			$tag->track_set($tracknum);
+			$tag->album_set($name);
+			$tag->set_frame(TSST => $title);
+			$tag->rm_frame($_) foreach (qw< TPOS >, 'TXXX[MusicBrainz Album Id]');
+			$tag->attach($mp3)->save unless $OPT{n};
+		}
+	}
+}
+
+
+sub get_volume
+{
+	my ($num) = @_;
+	my $vol = $volumes[$num];
+	my $name = $mix_name; $mix_name .= ' ' . Roman($num) if $volno > 1;
+	my $title = $vol->{title};
+	my $tracks = $vol->{tracks};
+	return ($vol, $name, $title, $tracks);
+}
+
+
+sub mix_dir
+{
+	my ($type, $name) = @_;
+	return $MUSICHOME->subdir( mixes => $type => $name );
+}
