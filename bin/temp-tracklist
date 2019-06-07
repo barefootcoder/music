@@ -1,7 +1,7 @@
 #! /usr/bin/env perl
 
 use myperl::Script;
-use Path::Class;
+use Path::Class::Tiny;
 
 
 const my $TRACKLIST_DIR => dir( $ENV{MUSICHOME}, tracklists => misc  => );
@@ -9,6 +9,7 @@ const my $TRACKLIST_DIR => dir( $ENV{MUSICHOME}, tracklists => misc  => );
 opts <<'-';
     [-n] -R <num> | <pattern> | <tracklist>
 	-n : dry run: don't build the tracklist, just say what tracks you picked
+	-a : instead of replacing the temporary tracklist, append to it
     -R : pick <num> random selections from the queue
     <pattern>   : get all selections from the queue matching <pattern>
 	<tracklist> : get all tracks from <tracklist> *except* those already in mixes
@@ -49,7 +50,8 @@ if ($OPT{n})
 }
 else
 {
-	$TRACKLIST_DIR->file('temporary.m3u')->spew([
+	my $action = $OPT{a} ? 'append' : 'spew';
+	$TRACKLIST_DIR->file('temporary.m3u')->$action([
 		map   { "$_$/"                 }
 		apply { say file($_)->basename }
 			 @tracks
