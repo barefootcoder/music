@@ -27,6 +27,7 @@ my $mode_arg = shift;
 my $info = MP3::Info->new("$mp3file");
 my $bitrate = $info->bitrate;
 
+my ($from, $to);
 given ($mode)
 {
 	when ('swap')
@@ -37,7 +38,8 @@ given ($mode)
 		system('mv', $mp3file, $bakfile);
 
 		system( $sox, $bakfile, '-C', $bitrate, $mp3file, qw< reverse silence 1 0.1 0.1% reverse >);
-		system( 'mp3cptags', '-f', $bakfile, $mp3file );
+		$from = $bakfile;
+		$to   = $mp3file;
 	}
 
 	when ('chop')
@@ -48,6 +50,10 @@ given ($mode)
 
 		system( $sox, $mp3file, '-C', $bitrate, $destfile, trim => 0, "=$mode_arg",
 				qw< reverse silence 1 0.1 0.1% reverse >);
-		system( 'mp3cptags', '-f', $mp3file, $destfile );
+		$from = $mp3file;
+		$to   = $destfile;
 	}
 }
+
+system( 'mp3cptags', '-f', $from, $to );
+system( 'mp3time',         $from, $to );
