@@ -69,6 +69,7 @@ my @BAD_FRAMES =
 	'TXXX[ENSEMBLE]',								# still ANOTHER way to say it???
 	'TXXX[ALBUMARTIST]',							# c'mon ... seriously?
 	'TXXX[Artists]',								# okay, now you're just fucking with me
+	'TXXX[ARTISTS]',								# yep, fucking with me
 	'TXXX[PZTagEditor Info]',						# WTF??
 	'TXXX[MusicBrainz Album Type]',					# soundtrack, etc; we'll use it, but don't need to keep it
 	'TXXX[MusicBrainz Album Status]',				# official, bootleg, etc; not useful
