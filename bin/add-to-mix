@@ -12,7 +12,7 @@ use Music::Dirs;
 
 my $pattern = shift;
 $pattern =~ s/\.m3u$//;
-my @mixes = grep { m{\Q$pattern\E[^/]*\.m3u}i } glob("$ENV{MUSICHOME}/tracklists/[CRPMm]*/*.m3u");
+my @mixes = grep { m{\Q$pattern\E[^/]*\.m3u}i } glob("$ENV{MUSICHOME}/tracklists/[CRPMmg]*/*.m3u");
 usage_error("no such mix [$pattern]") if @mixes == 0;
 fatal_error("multiple candidates:", map { "\t$_" } @mixes, "please narrow it down") if @mixes > 1;
 
