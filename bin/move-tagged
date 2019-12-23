@@ -3,9 +3,10 @@
 . ~/bin/bash_funcs
 
 dir="$1"
+new="$2"
 album="$(basename "$dir")"
 tagdir="$(dirname "$dir")"
-newdir="$MUSICHOME/Albums/$album"
+newdir="$MUSICHOME/${new:-Albums}/$album"
 
 [[ -d $dir ]] || die "arg must be a directory"
 [[ $tagdir -ef $MUSICHOME/for-tagging ]] || die "album dir must be in tagging dir"
