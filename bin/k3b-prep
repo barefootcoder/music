@@ -1,17 +1,25 @@
 #!/usr/bin/env perl
 
-use myperl DEBUG => 1;
+use myperl::Script;
 use autodie qw< :all >;
 
-use MP3::Tag;
-use IO::Prompt;
 use File::Copy;
-use File::Copy::Recursive qw< dircopy >;
+use Path::Class;
 
 use Music;
 
 
-const our $DEST => $MUSICHOME->subdir('k3b', 'for-burning');
+const our $DEST    => $MUSICHOME->subdir('k3b', 'for-burning');
+const our $TRIMDIR => $MUSICHOME->subdir('alt', 'trimmed'    );
+
+$| = 1;
+
+
+opts <<'-';
+	<m3u-playlist> [<num>]
+	<m3u-playlist> : playlist file to read
+	<num>          : for a multi-volume playlist, do only this volume
+-
 
 
 my $playlist = shift;
@@ -29,12 +37,25 @@ foreach (@tracks)
 	die("can't open track: $_") unless -r;
 	my $track = sprintf("%02d %s", ++$tracknum, file($_)->basename);
 	$track =~ s/[?]//g;													# some chars K3B can't handle
-	copy $_, $DEST->file($track);
+	my $burnfile = $DEST->file($track);
+	printf "track: %02d ... copying ... ", $tracknum;
+	copy $_, $burnfile;
+	print "trimming ... ";
+	system('trim-silence', $burnfile);
+	print "removing backup ... ";
+	unlink $TRIMDIR->file($track);
+	say "done";
 }
 
 say "Ready to burn.";
 say "Go into K3B and add files from $DEST.";
-say "Press <enter> when complete.";
+say "Go into Project / Properties / Advanced and check Normalize volume levels.";
+say "Select all files, right-click, Properties / Options, set Post-Gap to 0:00.";
+say "Press <enter> when burn is complete.";
 <STDIN>;
 
-$_->remove foreach $DEST->children;
+say "You must remove the burn files before you can burn a different disc.";
+if (confirm "Remove them now?")
+{
+	$_->remove foreach $DEST->children;
+}
