@@ -6,12 +6,14 @@ use Music;
 
 
 my %found;
-while (my $file = $SINGLES_DIR->next)
+my $checked = 0;
+foreach my $file ($SINGLES_DIR->children)
 {
 	if ($file =~ m{/([^/]+)\.mp3$})
 	{
+		++$checked;
 		my $track = $1;
-		if (my @tracks = `find $ALBUM_DIR -iname "$track.mp3" 2>/dev/null`)
+		if (my @tracks = `find $ALBUM_DIR/ -iname "$track.mp3" 2>/dev/null`)
 		{
 			$found{$track} = { map { chomp; file($_)->dir->basename => file($_) } @tracks };
 		}
@@ -31,4 +33,8 @@ if (%found)
 			system("mp3diff", $found{$track}->{$_}, $SINGLES_DIR->file($track . '.mp3'));
 		}
 	}
+}
+else
+{
+	say "Checked $checked tracks but didn't find any dups.";
 }
