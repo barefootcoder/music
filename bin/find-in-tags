@@ -1,0 +1,96 @@
+#! /usr/bin/env perl
+
+use myperl;
+use autodie ':all';
+
+use File::Next;
+
+use Music;
+use MP3::Info;
+
+$MP3::Info::try_harder = 1;
+
+
+my $prog = shift or fatal_error("must supply program to process frames in tags");
+$prog = fixup_prog($prog);
+
+our $tag;
+my $processor = q{
+	sub find
+	{
+		##prog##
+	}
+	1;
+};
+$processor =~ s/##prog##/$prog/;
+if (DEBUG >= 2)
+{
+	say STDERR '>>>>> Perl processor:';
+	say STDERR $processor;
+	say STDERR '<<<<<';
+}
+eval $processor or fatal_error("compile error: $@");
+
+my $errors = 0;
+my $next = File::Next::files({ file_filter => sub { /\.mp3$/ }, follow_symlinks => 0 }, @ARGV);
+while ( my $file = $next->() )
+{
+	local $_ = $file;
+	local $tag = undef;
+	say $_ if eval { find() };
+	if ( $@ )
+	{
+		warn("Error processing: $_ [$@]");
+		die("Too many errors!") if ++$errors >= 50;
+	}
+}
+
+
+func fixup_prog ($prog)
+{
+	use Text::Balanced qw< extract_quotelike extract_multiple >;
+	state $FRAME_RE = qr/[\w\[\]]+/;
+
+	# stash away quoted things so we don't get false positives
+	# (as ever, stolen shamelessly from Filter::Simple by The Damian)
+	my @quoted_strings;
+	$prog = join('', map { ref $_ ? scalar((push @quoted_strings, $_), "{Q$#quoted_strings}") : $_ }
+			extract_multiple($prog,
+			[
+					{ Q => sub { extract_quotelike($_[0]) } },
+					{ C => qr/#.*?(?=\n)/ },							# eat comments, in case there's quotes in there
+					qr/./,
+			])
+	);
+
+	$prog =~ s/:($FRAME_RE)/frame(q{$1})/g;
+	$prog =~ s/:\?($FRAME_RE)/frame_exists(q{$1})/g;
+	$prog =~ s/:-(\w+)/status_is(q{$1})/g;
+
+	# some whitespace niceties
+	$prog =~ s/^(\t+)/ ' ' x (4 * length($1)) /emg;						# poor man's `expand`
+	$prog =~ s/\n/\n		/g;											# indent for where it'll land in $processor
+
+	$prog =~ s/{Q(\d+)}/${$quoted_strings[$1]}/g;						# put any quoted strings back
+	return $prog;
+}
+
+
+func frame ($name)
+{
+	$tag //= get_tag($_);
+	return $tag->$name if $name eq lc $name;							# method name
+	return $tag->get_frame($name);										# hopefully a frame name
+}
+
+func frame_exists ($name)
+{
+	return defined frame($name);
+}
+
+
+func status_is ($stat)
+{
+	$tag //= get_tag($_);
+	return lc $tag->status eq lc $stat;
+}
