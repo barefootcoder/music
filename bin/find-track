@@ -14,7 +14,7 @@ say file($_)->absolute while $_ = $tracks->();
 
 
 my $pattern = qr/@ARGV/i;
-my @mixes = grep { grep { /$pattern/ } $_->slurp } glob($TRACKLIST_DIR->file("[CRPMmg]*", "*.m3u"));
+my @mixes = grep { grep { /$pattern/ } $_->slurp } glob($TRACKLIST_DIR->file("[CRPMmrg]*", "*.m3u"));
 if (@mixes)
 {
 	say '';
