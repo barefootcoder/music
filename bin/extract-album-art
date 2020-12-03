@@ -1,0 +1,29 @@
+#!/usr/bin/env perl
+
+use myperl::Script;
+use autodie qw< :all >;
+
+use Music;
+
+
+opts <<'-';
+	[-F <frame-override>] <mp3> <outfile>
+	-F : use frame <frame-override> instead of "APIC"
+	<mp3>     : .mp3 file to pull image from
+	<outfile> : file to write the image to
+-
+
+
+my ($mp3, $filename) = @ARGV;
+die("must supply valid MP3 file") unless $mp3 and -r $mp3;
+die("must supply filename") unless $filename;
+
+my $file = $MUSICHOME->file('covers', "$filename.jpg");
+die("file $file cannot exist") if -e $file;
+
+
+my $image = extract_album_art($mp3, $OPT{F} // ());
+die("can't get image out of source file: $mp3") unless $image;
+
+$file->spew( iomode => '>:raw', $image);
+system("ls -lh $file");

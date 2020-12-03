@@ -426,13 +426,13 @@ func attach_album_art ($track, $image)
 	$tag->save;
 }
 
-func extract_album_art ($track)
+func extract_album_art ($track, $fname = 'APIC')
 {
 	my $tag = $track->isa('MusicCollection::Tag') ? $track : get_tag($track);
 	debuggit(4 => "tag is", DUMP => $tag);
 
 	return undef unless $tag->has_v2;
-	my $frame = $tag->get_frame('APIC');
+	my $frame = $tag->get_frame($fname);
 	return undef unless defined $frame;
 	return ref $frame eq 'HASH' ? $frame->{'_Data'} : $frame;
 }
