@@ -7,7 +7,7 @@ use Path::Class::Tiny;
 const my $TRACKLIST_DIR => dir( $ENV{MUSICHOME}, tracklists => misc  => );
 
 opts <<'-';
-    [-n] -R <num> | <pattern> | <tracklist>
+    [-n] [-a] { -R <num> | <pattern> | <tracklist> }
 	-n : dry run: don't build the tracklist, just say what tracks you picked
 	-a : instead of replacing the temporary tracklist, append to it
     -R : pick <num> random selections from the queue
@@ -24,6 +24,8 @@ sub get_tracks ($)
 
 
 my ($pattern) = @ARGV;
+usage_error("must supply pattern, tracklist, or -R") unless $pattern or $OPT{R};
+
 my @tracks;
 if ($pattern and $pattern =~ /\.m3u$/ and -r $pattern)
 {
