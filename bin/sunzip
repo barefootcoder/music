@@ -1,23 +1,39 @@
 #!/usr/bin/env perl
 
-use myperl DEBUG => 1;
+use myperl::Script;
 use autodie qw< :all >;
 
 use MP3::Tag;
 use File::Copy;
-use IO::Prompter;
+use Path::Class::Tiny;
 use File::Copy::Recursive qw< dircopy >;
 
 use Music;
 
 
+# mainly to supply a help option
+opts <<'-';
+	<zip> <queue>
+	<zip>   : zipfile to unpack tracks from
+	<queue> : secondary queue to add tracks to (partial match okay)
+-
+
 # check args
-my $zip = file(shift);
+my ($zip, $secondary_queue) = @ARGV;
+usage_error("must supply zipfile") unless $zip;
+usage_error("must supply secondary queue") unless $secondary_queue;
+
+$zip = file($zip);
 my ($album) = $zip->basename =~ /^(.*)\.zip$/;
 unless ($album)
 {
 	usage_error("I need a zipfile to play with");
 }
+
+my @candidates = $TRACKLIST_DIR->child("misc")->children( qr/^q.*$secondary_queue.*\.m3u$/ );
+fatal("no such secondary queue (q*$secondary_queue*.m3u)") unless @candidates;
+fatal("too many secondary queue options for $secondary_queue") if @candidates > 1;
+$secondary_queue = shift @candidates;
 
 
 # new way: just make a pointless albumname for the dir and let fixup_album take care of the hard stuff
@@ -95,8 +111,12 @@ system('check-picard', album(dir => $new_album));
 my $queue = $TRACKLIST_DIR->file('misc', 'qqueue.m3u');
 if (-w $queue)
 {
+	my $all_tracks = album(tracklist => $new_album)->slurp;
 	my $fh = $queue->open('a');
-	print $fh album(tracklist => $new_album)->slurp;
+	print $fh $all_tracks;
+	# also add to secondary queue
+	$fh = $secondary_queue->open('a');
+	print $fh $all_tracks;
 }
 else
 {
